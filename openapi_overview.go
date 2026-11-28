@@ -4,6 +4,9 @@ import (
 	"context"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/privacy"
+	"github.com/shutthegoatup/prospector/internal/sales"
+	"github.com/shutthegoatup/prospector/internal/signing"
 )
 
 // GetCompanyOverview reads what the company page reads, with the same calls.
@@ -56,7 +59,7 @@ func (s apiServer) GetCompanyOverview(ctx context.Context, in api.GetCompanyOver
 	}
 	for _, p := range people {
 		person := api.CompanyPerson{Id: p.ID, Name: displayName(p), Title: p.Title, Linkedin: deref(p.Linkedin), Stage: contactStage(p), Pending: []api.PendingDetail{}}
-		if len(alternates(deref(p.Person))) > 1 {
+		if len(privacy.Alternates(deref(p.Person))) > 1 {
 			person.Several = deref(p.Person)
 		}
 		for _, d := range pending[p.ID] {
@@ -65,10 +68,10 @@ func (s apiServer) GetCompanyOverview(ctx context.Context, in api.GetCompanyOver
 		out.People = append(out.People, person)
 	}
 	for _, r := range subs {
-		out.Subscriptions = append(out.Subscriptions, subscriptionOut(r, day))
+		out.Subscriptions = append(out.Subscriptions, sales.SubscriptionOut(r, day))
 	}
 	for _, a := range agreements {
-		out.Agreements = append(out.Agreements, agreementOut(a))
+		out.Agreements = append(out.Agreements, signing.AgreementOut(a))
 	}
 	return api.GetCompanyOverview200JSONResponse(out), nil
 }

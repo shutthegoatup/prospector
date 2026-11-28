@@ -17,6 +17,8 @@ import (
 	"github.com/pdfcpu/pdfcpu/pkg/api"
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/model"
 	"gorm.io/gorm"
+
+	"github.com/shutthegoatup/prospector/internal/signing"
 )
 
 func TestAnAgreementsEventsShowAnyChangeAfterTheFact(t *testing.T) {
@@ -66,7 +68,7 @@ func TestAnAgreementsEventsShowAnyChangeAfterTheFact(t *testing.T) {
 			if err := tx.Where("agreement_id = ?", 7).Order("id").Find(&all).Error; err != nil {
 				return err
 			}
-			if err := checkChain(all); !errors.Is(err, errBrokenChain) {
+			if err := signing.CheckChain(all); !errors.Is(err, signing.ErrBrokenChain) {
 				t.Errorf("%s went unnoticed: %v", what, err)
 			}
 			return errors.New("undo")
@@ -89,7 +91,7 @@ func TestAnOrganisationsSealingKeyIsMadeOnceAndKeptSealed(t *testing.T) {
 	if !key.Equal(again) || !cert.Equal(same) {
 		t.Error("a second use made another key")
 	}
-	if cert.Subject.CommonName != "Alpha (Prospector)" || len(cert.UnknownExtKeyUsage) != 1 || !cert.UnknownExtKeyUsage[0].Equal(documentSigning) {
+	if cert.Subject.CommonName != "Alpha (Prospector)" || len(cert.UnknownExtKeyUsage) != 1 || !cert.UnknownExtKeyUsage[0].Equal(signing.DocumentSigning) {
 		t.Errorf("the certificate: %s, %v", cert.Subject, cert.UnknownExtKeyUsage)
 	}
 	var stored SealKey
@@ -125,7 +127,7 @@ func TestAPDFTakenAtUploadCanBeSealed(t *testing.T) {
 	hannah := must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
 	a := must(s.AddAgreement(o.ID, *hannah.CompanyID, "Form", "Ada Lovelace"))
 	must(s.PutAgreementFile(o.ID, a.ID, "form.pdf", buildPDF("1.3", 2, "", "/Annots [<< /Type /Annot /Subtype /Caret /Rect [10 10 20 20] >>] "), "Ada Lovelace"))
-	r := must(s.AddRecipient(o, a.ID, RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
+	r := must(s.AddRecipient(o, a.ID, signing.RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
 	must(s.PutAgreementFields(o.ID, a.ID, []AgreementField{{RecipientID: r.ID, Page: 2, Kind: "signature", X: 0.1, Y: 0.7, W: 0.3, H: 0.06}}))
 	if err := s.TrySeal(o, a.ID); err != nil {
 		t.Errorf("sealing a PDF the upload took: %v", err)
@@ -142,8 +144,8 @@ func sealedDraft(t *testing.T) (*Store, *Org, *Agreement) {
 	zoe := must(s.QuickAddPerson(o, QuickAdd{Name: "Zoë Łukasiewicz-Øster", Company: "Larkmoor Yachts", Email: "zoe@larkmoor.example"}, "Ada Lovelace"))
 	a := must(s.AddAgreement(o.ID, *hannah.CompanyID, "Service agreement", "Ada Lovelace"))
 	must(s.PutAgreementFile(o.ID, a.ID, "service.pdf", buildPDF("1.7", 3, "", "/Rotate 90 "), "Ada Lovelace"))
-	h := must(s.AddRecipient(o, a.ID, RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
-	z := must(s.AddRecipient(o, a.ID, RecipientSigner, &zoe.ID, nil, "Ada Lovelace"))
+	h := must(s.AddRecipient(o, a.ID, signing.RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
+	z := must(s.AddRecipient(o, a.ID, signing.RecipientSigner, &zoe.ID, nil, "Ada Lovelace"))
 	must(s.PutAgreementFields(o.ID, a.ID, []AgreementField{
 		{RecipientID: h.ID, Page: 3, Kind: "signature", X: 0.1, Y: 0.7, W: 0.3, H: 0.06},
 		{RecipientID: h.ID, Page: 3, Kind: "date", X: 0.1, Y: 0.78, W: 0.2, H: 0.03},
@@ -167,7 +169,7 @@ func TestADraftCanBeFilledInAndSealedBeforeItIsSent(t *testing.T) {
 
 	// A name the fonts can't draw is found before anything goes out.
 	han := must(s.QuickAddPerson(o, QuickAdd{Name: "王小明", Company: "Larkmoor Yachts", Email: "wang@larkmoor.example"}, "Ada Lovelace"))
-	must(s.AddRecipient(o, a.ID, RecipientCopy, &han.ID, nil, "Ada Lovelace"))
+	must(s.AddRecipient(o, a.ID, signing.RecipientCopy, &han.ID, nil, "Ada Lovelace"))
 	if err := s.TrySeal(o, a.ID); err == nil || !strings.Contains(err.Error(), "can't show") {
 		t.Errorf("a dry run with a name the fonts can't draw: %v", err)
 	}
@@ -178,11 +180,11 @@ func TestASealedAgreementIsFilledInCertifiedAndShowsAnyChange(t *testing.T) {
 	s, o, a := sealedDraft(t)
 	_, doc := must2(s.AgreementDocument(o.ID, a.ID))
 	when := time.Date(2026, 11, 27, 9, 31, 52, 0, time.UTC)
-	c := Certificate{Org: o.Name, Agreement: a.Name, Ref: "AGR-0001", Pages: 3, SentBy: "Ada Lovelace", SentAt: when.Add(-24 * time.Hour), CompletedAt: when,
-		Rounds:  []CertificateRound{{N: 1, Hash: a.FileHash, Outcome: "signed by everyone"}},
-		Signers: []CertificateSigner{{Name: "Hannah Pryce", Email: "hannah@larkmoor.example", Via: "typed name · email code", Typed: "Hannah Pryce", IP: "203.0.113.24", Browser: "Firefox on macOS", SignedAt: when}},
-		Events:  []CertificateEvent{{At: when, Text: "Signed by Hannah Pryce as \"Hannah Pryce\""}}, Consent: signingConsent}
-	stamps := []Stamp{{Page: 3, X: 0.1, Y: 0.7, W: 0.3, H: 0.06, Kind: "signature", Value: "Hannah Pryce"}, {Page: 2, X: 0.1, Y: 0.1, W: 0.03, H: 0.022, Kind: "tick", Value: "✓"}}
+	c := signing.Certificate{Org: o.Name, Agreement: a.Name, Ref: "AGR-0001", Pages: 3, SentBy: "Ada Lovelace", SentAt: when.Add(-24 * time.Hour), CompletedAt: when,
+		Rounds:  []signing.CertificateRound{{N: 1, Hash: a.FileHash, Outcome: "signed by everyone"}},
+		Signers: []signing.CertificateSigner{{Name: "Hannah Pryce", Email: "hannah@larkmoor.example", Via: "typed name · email code", Typed: "Hannah Pryce", IP: "203.0.113.24", Browser: "Firefox on macOS", SignedAt: when}},
+		Events:  []signing.CertificateEvent{{At: when, Text: "Signed by Hannah Pryce as \"Hannah Pryce\""}}, Consent: signing.SigningConsent}
+	stamps := []signing.Stamp{{Page: 3, X: 0.1, Y: 0.7, W: 0.3, H: 0.06, Kind: "signature", Value: "Hannah Pryce"}, {Page: 2, X: 0.1, Y: 0.1, W: 0.03, H: 0.022, Kind: "tick", Value: "✓"}}
 	out := must(s.SealDocument(o, doc, stamps, c))
 
 	pages, err := api.PageCount(context.Background(), bytes.NewReader(out.PDF), model.NewDefaultConfiguration())
@@ -190,16 +192,16 @@ func TestASealedAgreementIsFilledInCertifiedAndShowsAnyChange(t *testing.T) {
 		t.Errorf("the sealed document has %d pages (%v), want the 3 sent and the certificate", pages, err)
 	}
 	_, cert := must2(s.SealKey(o))
-	if err := checkSeal(out.PDF, cert); err != nil {
+	if err := signing.CheckSeal(out.PDF, cert); err != nil {
 		t.Fatalf("the seal: %v", err)
 	}
 	// One byte early in the document, inside what the seal covers, changed.
 	tampered := bytes.Clone(out.PDF)
 	tampered[200] ^= 0x01
-	if err := checkSeal(tampered, cert); err == nil {
+	if err := signing.CheckSeal(tampered, cert); err == nil {
 		t.Error("a changed byte left the seal holding")
 	}
-	if err := checkSeal(append(bytes.Clone(out.PDF), []byte("\n1 0 obj (added afterwards) endobj\n%%EOF\n")...), cert); err == nil {
+	if err := signing.CheckSeal(append(bytes.Clone(out.PDF), []byte("\n1 0 obj (added afterwards) endobj\n%%EOF\n")...), cert); err == nil {
 		t.Error("bytes added after the seal left it holding")
 	}
 	if !bytes.Contains(out.PDF, []byte("/P 1")) {
@@ -207,10 +209,10 @@ func TestASealedAgreementIsFilledInCertifiedAndShowsAnyChange(t *testing.T) {
 	}
 
 	// Text the fonts can't draw stops the seal rather than sealing as a blank.
-	for what, change := range map[string]func(*Certificate, []Stamp){
-		"a typed signature": func(_ *Certificate, st []Stamp) { st[0].Value = "王小明" },
-		"the agreement":     func(c *Certificate, _ []Stamp) { c.Agreement = "合同" },
-		"a signer's name":   func(c *Certificate, _ []Stamp) { c.Signers[0].Name = "سارا" },
+	for what, change := range map[string]func(*signing.Certificate, []signing.Stamp){
+		"a typed signature": func(_ *signing.Certificate, st []signing.Stamp) { st[0].Value = "王小明" },
+		"the agreement":     func(c *signing.Certificate, _ []signing.Stamp) { c.Agreement = "合同" },
+		"a signer's name":   func(c *signing.Certificate, _ []signing.Stamp) { c.Signers[0].Name = "سارا" },
 	} {
 		c2, st2 := c, slices.Clone(stamps)
 		c2.Signers = slices.Clone(c.Signers)
@@ -220,7 +222,7 @@ func TestASealedAgreementIsFilledInCertifiedAndShowsAnyChange(t *testing.T) {
 		}
 	}
 	_, theirs := must2(s.SealKey(mustOrg(t, s, "beta")))
-	if err := checkSeal(out.PDF, theirs); err == nil {
+	if err := signing.CheckSeal(out.PDF, theirs); err == nil {
 		t.Error("the seal holds for another organisation's key")
 	}
 	if !strings.Contains(string(out.PDF), "/ETSI.CAdES.detached") || !strings.Contains(string(out.PDF), "/DocMDP") {
@@ -237,9 +239,9 @@ func TestAStampLandsWhereItsFieldWasPlaced(t *testing.T) {
 		t.Skip("pdftoppm isn't installed")
 	}
 	pages := []string{"", "/Rotate 90 ", "/Rotate 270 ", "/CropBox [50 100 545 742] ", "/CropBox [50 100 545 742] /Rotate 180 "}
-	var stamps []Stamp
+	var stamps []signing.Stamp
 	for i := range pages {
-		stamps = append(stamps, Stamp{Page: i + 1, X: 0.1, Y: 0.2, W: 0.3, H: 0.05, Kind: "tick", Value: "✓"})
+		stamps = append(stamps, signing.Stamp{Page: i + 1, X: 0.1, Y: 0.2, W: 0.3, H: 0.05, Kind: "tick", Value: "✓"})
 	}
 	doc := pagesPDF(pages)
 	out, err := stampPDF(doc, stamps)

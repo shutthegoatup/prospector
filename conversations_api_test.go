@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/onboarding"
 )
 
 // The React Conversations page reads the board, cards and all, from the API.
@@ -25,7 +26,7 @@ func TestTheBoardIsReadThroughTheAPI(t *testing.T) {
 		}
 	}
 	renewal := must(s.StartDeal(o.ID, hannah.ID, "renewal", "Ada Lovelace"))
-	must(s.StartOnboarding(o.ID, OnboardingIn{Company: *hannah.CompanyID, Start: day}, "Ada Lovelace"))
+	must(s.StartOnboarding(o.ID, onboarding.OnboardingIn{Company: *hannah.CompanyID, Start: day}, "Ada Lovelace"))
 
 	ines := must(s.QuickAddPerson(o, QuickAdd{Name: "Ines Moreau", Company: "Belair Kitchens"}, "Ada Lovelace"))
 	if err := s.Mark(o.ID, ines.ID, "replied", day, "Ada Lovelace"); err != nil {
@@ -34,7 +35,7 @@ func TestTheBoardIsReadThroughTheAPI(t *testing.T) {
 	if err := s.Update(o.ID, ines.ID, "stage", "won", "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	must(s.StartOnboarding(o.ID, OnboardingIn{Company: *ines.CompanyID, Start: day}, "Ada Lovelace"))
+	must(s.StartOnboarding(o.ID, onboarding.OnboardingIn{Company: *ines.CompanyID, Start: day}, "Ada Lovelace"))
 	for _, step := range must(s.Onboardings(o.ID, *ines.CompanyID, day))[0].Steps {
 		if err := s.SetOnboardingStep(o.ID, step.ID, "done", "yes", "Ada Lovelace"); err != nil {
 			t.Fatal(err)

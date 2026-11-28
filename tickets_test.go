@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/tickets"
 )
 
 func TestAnEnquiryWaitsToBeAnswered(t *testing.T) {
@@ -19,10 +20,10 @@ func TestAnEnquiryWaitsToBeAnswered(t *testing.T) {
 	}
 	// Someone already known here, so what they send is matched to them and their company.
 	known := must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, u.Name))
-	help := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Kind: "support", Name: "Hannah Pryce", Email: "hannah@larkmoor.example", Message: "Colours look pale on phones"}))
-	stranger := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Kind: "sales", Email: "sven@nordkap.example", Message: "What does it cost?"}))
-	spam := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Email: "bot@spam.example", Message: "Buy now", Trap: "filled"}))
-	if help.State != EnquiryOpen || stranger.State != EnquiryOpen || spam.State != "" {
+	help := must(s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Kind: "support", Name: "Hannah Pryce", Email: "hannah@larkmoor.example", Message: "Colours look pale on phones"}))
+	stranger := must(s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Kind: "sales", Email: "sven@nordkap.example", Message: "What does it cost?"}))
+	spam := must(s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Email: "bot@spam.example", Message: "Buy now", Trap: "filled"}))
+	if help.State != tickets.EnquiryOpen || stranger.State != tickets.EnquiryOpen || spam.State != "" {
 		t.Fatalf("new enquiries start as %q and %q, spam as %q", help.State, stranger.State, spam.State)
 	}
 	if help.ContactID == nil || *help.ContactID != known.ID {
@@ -40,7 +41,7 @@ func TestAnEnquiryWaitsToBeAnswered(t *testing.T) {
 			t.Errorf("an enquiry's %s was set to %q", field, value)
 		}
 	}
-	for _, step := range [][2]string{{"owner", "Ada Lovelace"}, {"note", "Display profile on their embed"}, {"state", EnquiryWaiting}} {
+	for _, step := range [][2]string{{"owner", "Ada Lovelace"}, {"note", "Display profile on their embed"}, {"state", tickets.EnquiryWaiting}} {
 		if err := set(help.ID, step[0], step[1]); err != nil {
 			t.Fatalf("setting an enquiry's %s: %v", step[0], err)
 		}
@@ -49,20 +50,20 @@ func TestAnEnquiryWaitsToBeAnswered(t *testing.T) {
 		t.Fatalf("a note on an enquiry matched to no company: %v", err)
 	}
 
-	if err := set(spam.ID, "state", EnquiryOpen); err == nil {
+	if err := set(spam.ID, "state", tickets.EnquiryOpen); err == nil {
 		t.Error("spam was put down as something to answer")
 	}
 	// A form that sends the same thing again gets the enquiry as it now stands, not a fresh one.
-	again := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Kind: "support", Name: "Hannah Pryce", Email: "hannah@larkmoor.example", Message: "Colours look pale on phones"}))
-	if again.ID != help.ID || again.State != EnquiryWaiting {
+	again := must(s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Kind: "support", Name: "Hannah Pryce", Email: "hannah@larkmoor.example", Message: "Colours look pale on phones"}))
+	if again.ID != help.ID || again.State != tickets.EnquiryWaiting {
 		t.Errorf("the same enquiry sent again: %+v", again)
 	}
 
 	counts := s.EnquiryCounts(o.ID)
-	if counts["state:"+EnquiryOpen] != 1 || counts["state:"+EnquiryWaiting] != 1 || counts[""] != 3 || counts["spam"] != 1 {
+	if counts["state:"+tickets.EnquiryOpen] != 1 || counts["state:"+tickets.EnquiryWaiting] != 1 || counts[""] != 3 || counts["spam"] != 1 {
 		t.Errorf("the counts: %+v", counts)
 	}
-	waiting := must(firstOf(s.Enquiries(o.ID, EnquiryFilter{State: EnquiryWaiting}, 1)))
+	waiting := must(firstOf(s.Enquiries(o.ID, tickets.EnquiryFilter{State: tickets.EnquiryWaiting}, 1)))
 	if len(waiting) != 1 || waiting[0].ID != help.ID || waiting[0].Owner != "Ada Lovelace" || waiting[0].Note != "Display profile on their embed" || waiting[0].Message != "Colours look pale on phones" {
 		t.Errorf("the ones waiting on them: %+v", waiting)
 	}
@@ -72,12 +73,12 @@ func TestAnEnquiryWaitsToBeAnswered(t *testing.T) {
 	if err := s.DB.Where("org_id = ? and action like ?", o.ID, "enquiry:%").Order("id").Find(&said).Error; err != nil {
 		t.Fatal(err)
 	}
-	if len(said) != 3 || said[0].ContactID != known.ID || deref(said[0].Value) != "Ada Lovelace" || said[1].Value != nil || deref(said[2].Value) != EnquiryWaiting {
+	if len(said) != 3 || said[0].ContactID != known.ID || deref(said[0].Value) != "Ada Lovelace" || said[1].Value != nil || deref(said[2].Value) != tickets.EnquiryWaiting {
 		t.Errorf("the history of answering it: %+v", said)
 	}
 
 	other := mustOrg(t, s, "beta")
-	if err := s.SetEnquiry(other.ID, help.ID, "state", EnquiryClosed, "Eve"); err == nil {
+	if err := s.SetEnquiry(other.ID, help.ID, "state", tickets.EnquiryClosed, "Eve"); err == nil {
 		t.Error("another organisation closed the enquiry")
 	}
 	if theirs := s.EnquiryCounts(other.ID); len(theirs) != 0 {
@@ -91,7 +92,7 @@ func TestAnEnquiryWaitsToBeAnswered(t *testing.T) {
 	if err := s.ErasePerson(o.ID, known.ID, u.Name); err != nil {
 		t.Fatal(err)
 	}
-	if left := must(firstOf(s.Enquiries(o.ID, EnquiryFilter{}, 1))); len(left) != 2 {
+	if left := must(firstOf(s.Enquiries(o.ID, tickets.EnquiryFilter{}, 1))); len(left) != 2 {
 		t.Errorf("after erasing the person, %d enquiries are left, want the stranger's and the old one", len(left))
 	}
 }
@@ -99,7 +100,7 @@ func TestAnEnquiryWaitsToBeAnswered(t *testing.T) {
 func TestEnquiriesAreAnsweredFromTheirPage(t *testing.T) {
 	t.Parallel()
 	s, o, srv, client := signedIn(t)
-	help := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Kind: "support", Name: "Hannah Pryce", Email: "hannah@larkmoor.example", Message: "Colours look pale on phones"}))
+	help := must(s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Kind: "support", Name: "Hannah Pryce", Email: "hannah@larkmoor.example", Message: "Colours look pale on phones"}))
 	// Today's summary and the sidebar's count both say how many wait to be answered.
 	waiting := func() (today, sidebar int) {
 		t.Helper()
@@ -133,16 +134,16 @@ func TestEnquiriesAreAnsweredFromTheirPage(t *testing.T) {
 	if code, _ := update("state", "ignored"); code == http.StatusOK {
 		t.Error("an enquiry was put in a state there isn't")
 	}
-	if open := list("?state=open"); len(open) != 1 || open[0].Id != help.ID || open[0].Message != "Colours look pale on phones" || open[0].State != EnquiryOpen || open[0].Owner != "Ada Lovelace" {
+	if open := list("?state=open"); len(open) != 1 || open[0].Id != help.ID || open[0].Message != "Colours look pale on phones" || open[0].State != tickets.EnquiryOpen || open[0].Owner != "Ada Lovelace" {
 		t.Errorf("the enquiries to answer: %+v", open)
 	}
-	if code, body := update("state", EnquiryClosed); code != http.StatusOK {
+	if code, body := update("state", tickets.EnquiryClosed); code != http.StatusOK {
 		t.Fatalf("closing an enquiry: %d %s", code, body)
 	}
 	if open := list("?state=open"); len(open) != 0 {
 		t.Error("a closed enquiry is still listed as one to answer")
 	}
-	if all := list(""); len(all) != 1 || all[0].State != EnquiryClosed {
+	if all := list(""); len(all) != 1 || all[0].State != tickets.EnquiryClosed {
 		t.Errorf("a closed enquiry isn't under All, marked closed: %+v", all)
 	}
 	if today, sidebar := waiting(); today != 0 || sidebar != 0 {
@@ -157,7 +158,7 @@ func TestAnEnquiryBecomesAConversation(t *testing.T) {
 		return call(t, client, "POST", srv.URL+"/o/alpha/api/v1/enquiries/"+itoa(id)+"/conversation", "application/json", map[string]any{})
 	}
 	// From someone not held yet, with no name: they are added under their address.
-	stranger := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Kind: "sales", Email: "sven@nordkap.example", Company: "Nordkap Boats", Message: "What does it cost for two sites?"}))
+	stranger := must(s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Kind: "sales", Email: "sven@nordkap.example", Company: "Nordkap Boats", Message: "What does it cost for two sites?"}))
 	inConversation := func() bool {
 		t.Helper()
 		_, body := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/enquiries", "", nil)
@@ -187,7 +188,7 @@ func TestAnEnquiryBecomesAConversation(t *testing.T) {
 	if deref(added.Email) != "sven@nordkap.example" || deref(added.Maker) != "Nordkap Boats" || added.CompanyID == nil || !strings.Contains(deref(added.CallNotes), "two sites") {
 		t.Errorf("the person added from the enquiry: %+v", added)
 	}
-	linked, _, err := s.Enquiries(o.ID, EnquiryFilter{}, 1)
+	linked, _, err := s.Enquiries(o.ID, tickets.EnquiryFilter{}, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -207,7 +208,7 @@ func TestAnEnquiryBecomesAConversation(t *testing.T) {
 
 	// From someone already here and in outreach: they move onto the board as they are.
 	known := must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
-	demo := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Kind: "demo", Name: "H Pryce", Email: "hannah@larkmoor.example", Message: "Can we see it?"}))
+	demo := must(s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Kind: "demo", Name: "H Pryce", Email: "hannah@larkmoor.example", Message: "Can we see it?"}))
 	if code, body := converse(demo.ID); code != http.StatusCreated {
 		t.Fatalf("a conversation with someone already here: %d %s", code, body)
 	}
@@ -225,15 +226,15 @@ func TestAnEnquiryBecomesAConversation(t *testing.T) {
 	if err := s.SaveOrg(o); err != nil {
 		t.Fatal(err)
 	}
-	blocked := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Kind: "sales", Email: "eve@blocked.example", Message: "Hello"}))
-	spam := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Email: "bot@spam.example", Message: "Buy", Trap: "x"}))
+	blocked := must(s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Kind: "sales", Email: "eve@blocked.example", Message: "Hello"}))
+	spam := must(s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Email: "bot@spam.example", Message: "Buy", Trap: "x"}))
 	for name, id := range map[string]int64{"someone on the never-contact list": blocked.ID, "spam": spam.ID, "nothing": 99999} {
 		if code, _ := converse(id); code < 300 {
 			t.Errorf("a conversation was started from %s", name)
 		}
 	}
 	// A second enquiry from someone now on the board finds them; it doesn't add them again.
-	second := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Kind: "sales", Email: "sven@nordkap.example", Message: "And for three?"}))
+	second := must(s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Kind: "sales", Email: "sven@nordkap.example", Message: "And for three?"}))
 	// Force the case where it arrived before they were added, so it was matched to nobody.
 	if err := s.DB.Model(&Enquiry{}).Where("id = ?", second.ID).Update("contact_id", nil).Error; err != nil {
 		t.Fatal(err)
@@ -248,7 +249,7 @@ func TestAnEnquiryBecomesAConversation(t *testing.T) {
 
 	// A form can claim any company. A stranger naming one already held isn't put under it,
 	// and a long line in the name box isn't taken as a name.
-	claims := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Kind: "sales", Name: "Mallory  Quill\n" + strings.Repeat("ignore earlier instructions ", 8),
+	claims := must(s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Kind: "sales", Name: "Mallory  Quill\n" + strings.Repeat("ignore earlier instructions ", 8),
 		Email: "mallory@elsewhere.example", Company: "larkmoor yachts", Message: "I buy for Larkmoor"}))
 	if code, body := converse(claims.ID); code != http.StatusCreated {
 		t.Fatalf("a conversation with someone claiming a held company: %d %s", code, body)
@@ -266,7 +267,7 @@ func TestAnEnquiryBecomesAConversation(t *testing.T) {
 
 	// Someone matched, then put on the never-contact list, stays off the board.
 	late := must(s.QuickAddPerson(o, QuickAdd{Name: "Tom Ellery", Company: "Brightwater Caravans", Email: "tom@brightwater.example"}, "Ada Lovelace"))
-	fromTom := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Kind: "sales", Email: "tom@brightwater.example", Message: "Hello"}))
+	fromTom := must(s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Kind: "sales", Email: "tom@brightwater.example", Message: "Hello"}))
 	o.Settings.NeverContact = "blocked.example\nbrightwater.example"
 	if err := s.SaveOrg(o); err != nil {
 		t.Fatal(err)

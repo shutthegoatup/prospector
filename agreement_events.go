@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+
+	"github.com/shutthegoatup/prospector/internal/signing"
 )
 
 const (
@@ -39,7 +41,7 @@ func recordAgreementEvent(tx *gorm.DB, e AgreementEvent) (*AgreementEvent, error
 	if e.At.IsZero() {
 		e.At = time.Now().UTC().Truncate(time.Microsecond)
 	}
-	e.Hash = eventHash(e)
+	e.Hash = signing.EventHash(e)
 	if err := tx.Create(&e).Error; err != nil {
 		return nil, fmt.Errorf("recording what happened to agreement %d: %w", e.AgreementID, err)
 	}

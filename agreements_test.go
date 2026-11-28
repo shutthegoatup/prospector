@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/signing"
 )
 
 var samplePDF = testPDF(2, "")
@@ -100,7 +101,7 @@ func TestAnAgreementKeepsItsDocumentAsUploaded(t *testing.T) {
 	if code, _, _ := upload(t, http.DefaultClient, doc+"?name=a.pdf", writer, "application/pdf", []byte("<html><script>alert(1)</script>")); code != http.StatusBadRequest {
 		t.Errorf("something that isn't a PDF: %d", code)
 	}
-	if code, _, _ := upload(t, http.DefaultClient, doc, writer, "application/pdf", append([]byte("%PDF-"), make([]byte, agreementFileLimit)...)); code != http.StatusRequestEntityTooLarge {
+	if code, _, _ := upload(t, http.DefaultClient, doc, writer, "application/pdf", append([]byte("%PDF-"), make([]byte, signing.AgreementFileLimit)...)); code != http.StatusRequestEntityTooLarge {
 		t.Errorf("a document past the limit: %d", code)
 	}
 	if code, _, _ := upload(t, http.DefaultClient, doc, reader, "application/pdf", samplePDF); code != http.StatusForbidden {
@@ -225,7 +226,7 @@ func TestADocumentIsKeptByteForByte(t *testing.T) {
 		}
 	}
 	for given, want := range map[string]string{"..": "agreement.pdf", "evil\u202efdp.exe": "evilfdp.exe.pdf", "Contract.PDF": "Contract.PDF"} {
-		if got := fileName(given); got != want {
+		if got := signing.FileName(given); got != want {
 			t.Errorf("a file named %q is kept as %q, want %q", given, got, want)
 		}
 	}

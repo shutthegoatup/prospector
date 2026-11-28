@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/shutthegoatup/prospector/internal/onboarding"
 	"github.com/shutthegoatup/prospector/internal/request"
 )
 
@@ -105,7 +106,7 @@ func TestACustomersPageNamesNoMember(t *testing.T) {
 	a := &App{}
 	a.customerRender(w, httptest.NewRequest("GET", "/c", nil), http.StatusOK, CustomerView{State: "steps", Org: "Alpha", Steps: []OnboardingStep{
 		{ID: 1, Name: "Send files", DoneOn: &on, DoneBy: "Ada Lovelace"},
-		{ID: 2, Name: "Approve renders", DoneOn: &on, DoneBy: customerActor},
+		{ID: 2, Name: "Approve renders", DoneOn: &on, DoneBy: onboarding.CustomerActor},
 	}})
 	body := w.Body.String()
 	if strings.Contains(body, "Ada") || strings.Contains(body, "done_by") {

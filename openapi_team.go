@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/privacy"
 	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/say"
 )
@@ -348,7 +349,7 @@ func (s apiServer) VerifySSODomain(ctx context.Context, in api.VerifySSODomainRe
 }
 
 // exportResponse writes the export as it is, rather than through a map of it.
-type exportResponse struct{ out *OrgExport }
+type exportResponse struct{ out *privacy.OrgExport }
 
 func (e exportResponse) VisitExportOrgResponse(w http.ResponseWriter) error {
 	w.Header().Set("Cache-Control", "no-store")

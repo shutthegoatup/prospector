@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/sales"
 )
 
 // A search that comes to companies already here says so, by how each stood when it
@@ -27,7 +28,7 @@ func TestASearchLeavesOutWhatWasAlreadyHere(t *testing.T) {
 	if err := s.SetCompanyStage(o.ID, customer.ID, CompanyQualified, "", "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	must(s.AddSubscription(o.ID, SubscriptionIn{Company: customer.ID, Name: "Support", Amount: "1200", Per: PerYear, Start: today, TermMonths: 12, Then: ThenRenews}, "Ada Lovelace"))
+	must(s.AddSubscription(o.ID, sales.SubscriptionIn{Company: customer.ID, Name: "Support", Amount: "1200", Per: PerYear, Start: today, TermMonths: 12, Then: sales.ThenRenews}, "Ada Lovelace"))
 	talking := must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
 	if err := s.SetCompanyStage(o.ID, *talking.CompanyID, CompanyQualified, "", "Ada Lovelace"); err != nil {
 		t.Fatal(err)
@@ -110,7 +111,7 @@ func TestACompanyReachedThroughAPersonIsHeldToo(t *testing.T) {
 	if err := s.SetCompanyStage(o.ID, belair.ID, CompanyQualified, "", "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	must(s.AddSubscription(o.ID, SubscriptionIn{Company: belair.ID, Name: "Support", Amount: "1200", Per: PerYear, Start: time.Now().Format(dayLayout), TermMonths: 12, Then: ThenRenews}, "Ada Lovelace"))
+	must(s.AddSubscription(o.ID, sales.SubscriptionIn{Company: belair.ID, Name: "Support", Amount: "1200", Per: PerYear, Start: time.Now().Format(dayLayout), TermMonths: 12, Then: sales.ThenRenews}, "Ada Lovelace"))
 	quiet := must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Fennholt Campers", Domain: "fennholt.example"}))
 	if err := s.SetCompanyStage(o.ID, quiet.ID, CompanyQualified, "", "Ada Lovelace"); err != nil {
 		t.Fatal(err)

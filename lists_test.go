@@ -7,6 +7,8 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+
+	"github.com/shutthegoatup/prospector/internal/crm"
 )
 
 func seedCompanies(t *testing.T, s *Store, org int64, n int, stage, segment string) []Company {
@@ -129,7 +131,7 @@ func TestPipelineInSQL(t *testing.T) {
 				r.Name, r.Pipeline, r.People, pipeline(r.Company, listed), want[r.Name], len(people[r.Name]))
 		}
 	}
-	for _, stage := range pipelineStages {
+	for _, stage := range crm.PipelineStages {
 		n := 0
 		for _, st := range want {
 			if st == stage {

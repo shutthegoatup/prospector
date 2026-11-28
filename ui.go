@@ -5,6 +5,8 @@ import (
 	"errors"
 	"net/http"
 	"time"
+
+	"github.com/shutthegoatup/prospector/internal/tickets"
 )
 
 type Nav struct {
@@ -52,7 +54,7 @@ func (a *App) nav(q *Req) Nav {
 		n.Today += len(list)
 	}
 	n.Research = a.s.ToReview(q.Org.ID)
-	n.Enquiries = a.s.EnquiryCounts(q.Org.ID)["state:"+EnquiryOpen]
+	n.Enquiries = a.s.EnquiryCounts(q.Org.ID)["state:"+tickets.EnquiryOpen]
 	convs := a.conversations(q)
 	for k, list := range convs {
 		if k != "won" && k != "lost" {
@@ -104,7 +106,7 @@ func (a *App) todayElsewhere(org int64, now time.Time, d *TodayData) error {
 	if err != nil {
 		return err
 	}
-	d.Enquiries = a.s.EnquiryCounts(org)["state:"+EnquiryOpen]
+	d.Enquiries = a.s.EnquiryCounts(org)["state:"+tickets.EnquiryOpen]
 	onboard, err := a.s.Onboardings(org, 0, now.Format(dayLayout))
 	if err != nil {
 		return err

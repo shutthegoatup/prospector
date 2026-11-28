@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/shutthegoatup/prospector/internal/tickets"
 )
 
 const formSite = "https://www.shop.example"
@@ -59,7 +61,7 @@ func TestFormEnquiryIsKept(t *testing.T) {
 	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	intake := srv.URL + "/o/alpha/intake"
-	enquiry := EnquiryIn{Kind: "demo", Name: "Hannah Pryce", Email: "Hannah@Quay.example", Company: "Quay Marine",
+	enquiry := tickets.EnquiryIn{Kind: "demo", Name: "Hannah Pryce", Email: "Hannah@Quay.example", Company: "Quay Marine",
 		Message: "Could we see it running?", Page: formSite + "/pricing"}
 
 	if res, _ := fromSite(t, "POST", intake, formSite, enquiry); res.StatusCode != http.StatusForbidden {
@@ -87,7 +89,7 @@ func TestFormEnquiryIsKept(t *testing.T) {
 			t.Fatalf("an enquiry from a listed site: %d", res.StatusCode)
 		}
 	}
-	rows, err := firstOf(s.Enquiries(o.ID, EnquiryFilter{}, 1))
+	rows, err := firstOf(s.Enquiries(o.ID, tickets.EnquiryFilter{}, 1))
 	if err != nil || len(rows) != 1 {
 		t.Fatalf("stored %d enquiries, %v", len(rows), err)
 	}
@@ -112,21 +114,21 @@ func TestEnquiryOddities(t *testing.T) {
 	takeEnquiriesFrom(t, s, o, formSite)
 	intake := srv.URL + "/o/alpha/intake"
 
-	if res, _ := fromSite(t, "POST", intake, formSite, EnquiryIn{Name: "Nobody", Message: "hello"}); res.StatusCode != http.StatusBadRequest {
+	if res, _ := fromSite(t, "POST", intake, formSite, tickets.EnquiryIn{Name: "Nobody", Message: "hello"}); res.StatusCode != http.StatusBadRequest {
 		t.Errorf("an enquiry with no email: %d", res.StatusCode)
 	}
 	long := strings.Repeat("é", 20000)
-	if res, _ := fromSite(t, "POST", intake, formSite, EnquiryIn{Kind: "Partnership", Email: "omar@reef.example", Message: long}); res.StatusCode != http.StatusOK {
+	if res, _ := fromSite(t, "POST", intake, formSite, tickets.EnquiryIn{Kind: "Partnership", Email: "omar@reef.example", Message: long}); res.StatusCode != http.StatusOK {
 		t.Fatalf("an unknown kind and a long message: %d", res.StatusCode)
 	}
-	if res, _ := fromSite(t, "POST", intake, formSite, EnquiryIn{Kind: "sales", Email: "bot@spam.example", Message: "buy", Trap: "https://spam.example"}); res.StatusCode != http.StatusOK {
+	if res, _ := fromSite(t, "POST", intake, formSite, tickets.EnquiryIn{Kind: "sales", Email: "bot@spam.example", Message: "buy", Trap: "https://spam.example"}); res.StatusCode != http.StatusOK {
 		t.Fatalf("a filled trap field: %d", res.StatusCode)
 	}
-	rows, _ := firstOf(s.Enquiries(o.ID, EnquiryFilter{}, 1))
+	rows, _ := firstOf(s.Enquiries(o.ID, tickets.EnquiryFilter{}, 1))
 	if len(rows) != 1 || rows[0].Kind != "other" || len([]rune(rows[0].Message)) != 10000 {
 		t.Fatalf("kept %d, first %q with %d characters", len(rows), rows[0].Kind, len([]rune(rows[0].Message)))
 	}
-	spam, _ := firstOf(s.Enquiries(o.ID, EnquiryFilter{Spam: true}, 1))
+	spam, _ := firstOf(s.Enquiries(o.ID, tickets.EnquiryFilter{Spam: true}, 1))
 	if len(spam) != 1 || spam[0].Email != "bot@spam.example" {
 		t.Fatalf("spam kept apart: %+v", spam)
 	}
@@ -140,7 +142,7 @@ func TestEnquiryOddities(t *testing.T) {
 	// One sender can't fill the list.
 	var refused int
 	for i := range enquiriesPerSender + 2 {
-		res, _ := fromSite(t, "POST", intake, formSite, EnquiryIn{Email: "keen@reef.example", Message: fmt.Sprint("again ", i)})
+		res, _ := fromSite(t, "POST", intake, formSite, tickets.EnquiryIn{Email: "keen@reef.example", Message: fmt.Sprint("again ", i)})
 		if res.StatusCode == http.StatusTooManyRequests {
 			refused++
 			if res.Header.Get("Retry-After") != "3600" {
@@ -151,7 +153,7 @@ func TestEnquiryOddities(t *testing.T) {
 	if refused != 2 {
 		t.Errorf("%d of a sender's enquiries past the limit were refused, want 2", refused)
 	}
-	if res, _ := fromSite(t, "POST", intake, formSite, EnquiryIn{Email: "someone.else@reef.example", Message: "hello"}); res.StatusCode != http.StatusOK {
+	if res, _ := fromSite(t, "POST", intake, formSite, tickets.EnquiryIn{Email: "someone.else@reef.example", Message: "hello"}); res.StatusCode != http.StatusOK {
 		t.Errorf("another sender was held up too: %d", res.StatusCode)
 	}
 }
@@ -169,7 +171,7 @@ func TestEnquiryFindsWhoSentIt(t *testing.T) {
 		t.Fatal(err)
 	}
 	intake := srv.URL + "/o/alpha/intake"
-	for _, in := range []EnquiryIn{
+	for _, in := range []tickets.EnquiryIn{
 		{Kind: "sales", Email: "HANNAH@quay.example", Message: "What does it cost?"},
 		{Kind: "support", Email: "omar@reef.example", Message: "The upload stalls."},
 		{Kind: "feature", Email: "stranger@elsewhere.example", Message: "Please add exports."},
@@ -179,7 +181,7 @@ func TestEnquiryFindsWhoSentIt(t *testing.T) {
 		}
 	}
 	by := map[string]Enquiry{}
-	rows, _ := firstOf(s.Enquiries(o.ID, EnquiryFilter{}, 1))
+	rows, _ := firstOf(s.Enquiries(o.ID, tickets.EnquiryFilter{}, 1))
 	for _, e := range rows {
 		by[e.Email] = e
 	}
@@ -196,12 +198,12 @@ func TestEnquiryFindsWhoSentIt(t *testing.T) {
 	if !strings.Contains(page, "sent an enquiry · Hannah Pryce: Sales") {
 		t.Errorf("the company's history doesn't mention the enquiry: %s", page)
 	}
-	if kinds, _ := firstOf(s.Enquiries(o.ID, EnquiryFilter{Kind: "support"}, 1)); len(kinds) != 1 {
+	if kinds, _ := firstOf(s.Enquiries(o.ID, tickets.EnquiryFilter{Kind: "support"}, 1)); len(kinds) != 1 {
 		t.Errorf("filtering by kind found %d", len(kinds))
 	}
 
 	// Erasing someone takes what they wrote, matched to them or not.
-	if _, err := s.AddEnquiry(o.ID, "form", EnquiryIn{Email: "hannah@quay.example", Message: "An older note"}); err != nil {
+	if _, err := s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Email: "hannah@quay.example", Message: "An older note"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.DB.Model(&Enquiry{}).Where("message = ?", "An older note").Update("contact_id", nil).Error; err != nil {
@@ -210,7 +212,7 @@ func TestEnquiryFindsWhoSentIt(t *testing.T) {
 	if err := s.ErasePerson(o.ID, known.ID, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	left, _ := firstOf(s.Enquiries(o.ID, EnquiryFilter{}, 1))
+	left, _ := firstOf(s.Enquiries(o.ID, tickets.EnquiryFilter{}, 1))
 	for _, e := range left {
 		if e.Email == "hannah@quay.example" {
 			t.Errorf("an erased person's enquiry is still here: %q", e.Message)
@@ -226,7 +228,7 @@ func TestEnquiryFromAProduct(t *testing.T) {
 	s, o, srv, client := signedIn(t)
 	other := mustOrg(t, s, "beta")
 	api := srv.URL + "/o/alpha/api/v1/enquiries"
-	send := func(key string, in EnquiryIn) (int, string) {
+	send := func(key string, in tickets.EnquiryIn) (int, string) {
 		b, _ := json.Marshal(in)
 		req, _ := http.NewRequest("POST", api, strings.NewReader(string(b)))
 		req.Header.Set("content-type", "application/json")
@@ -241,7 +243,7 @@ func TestEnquiryFromAProduct(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	signup := EnquiryIn{Kind: "signup", Name: "Omar Reyes", Email: "omar@reef.example", Company: "Reef Boats", Site: "app", Trap: "https://reef.example"}
+	signup := tickets.EnquiryIn{Kind: "signup", Name: "Omar Reyes", Email: "omar@reef.example", Company: "Reef Boats", Site: "app", Trap: "https://reef.example"}
 	if code, _ := send(reader, signup); code != http.StatusForbidden {
 		t.Errorf("a key without the scope: %d", code)
 	}
@@ -249,11 +251,11 @@ func TestEnquiryFromAProduct(t *testing.T) {
 	if code != http.StatusOK || !strings.Contains(body, `"kind":"signup"`) {
 		t.Fatalf("a key with the scope: %d %s", code, body)
 	}
-	rows, _ := firstOf(s.Enquiries(o.ID, EnquiryFilter{}, 1))
+	rows, _ := firstOf(s.Enquiries(o.ID, tickets.EnquiryFilter{}, 1))
 	if len(rows) != 1 || rows[0].Via != "agent:back office" || rows[0].Site != "app" || rows[0].Spam {
 		t.Fatalf("stored as %+v", rows)
 	}
-	if theirs, _ := firstOf(s.Enquiries(other.ID, EnquiryFilter{}, 1)); len(theirs) != 0 {
+	if theirs, _ := firstOf(s.Enquiries(other.ID, tickets.EnquiryFilter{}, 1)); len(theirs) != 0 {
 		t.Error("another organisation sees it")
 	}
 	if err := s.DeleteEnquiry(other.ID, rows[0].ID); err == nil {
@@ -265,7 +267,7 @@ func TestEnquiryFromAProduct(t *testing.T) {
 	if code, body := call(t, client, "DELETE", srv.URL+"/o/alpha/api/v1/enquiries/"+itoa(rows[0].ID), "", nil); code != http.StatusNoContent {
 		t.Fatalf("an owner deleting an enquiry: %d %s", code, body)
 	}
-	if left, _ := firstOf(s.Enquiries(o.ID, EnquiryFilter{}, 1)); len(left) != 0 {
+	if left, _ := firstOf(s.Enquiries(o.ID, tickets.EnquiryFilter{}, 1)); len(left) != 0 {
 		t.Error("a deleted enquiry is still here")
 	}
 }
@@ -288,7 +290,7 @@ func TestEnquirySitesSetting(t *testing.T) {
 	if !strings.Contains(page, formSite) || !strings.Contains(page, "http://localhost:4322") {
 		t.Errorf("the settings don't hold the sites: %s", page)
 	}
-	if res, _ := fromSite(t, "POST", srv.URL+"/o/alpha/intake", "http://localhost:4322", EnquiryIn{Email: "dev@shop.example"}); res.StatusCode != http.StatusOK {
+	if res, _ := fromSite(t, "POST", srv.URL+"/o/alpha/intake", "http://localhost:4322", tickets.EnquiryIn{Email: "dev@shop.example"}); res.StatusCode != http.StatusOK {
 		t.Errorf("an enquiry from the second site: %d", res.StatusCode)
 	}
 }

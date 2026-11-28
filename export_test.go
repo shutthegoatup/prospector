@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/shutthegoatup/prospector/internal/privacy"
 )
 
 func TestExportPerson(t *testing.T) {
@@ -94,7 +96,7 @@ func TestExportPerson(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("export: %d %s", code, body)
 	}
-	var out PersonExport
+	var out privacy.PersonExport
 	do(json.Unmarshal([]byte(body), &out))
 	if deref(out.Person.Email) != hannahEmail || deref(out.Person.Phone) != "+44 20 7946 0000" || out.Person.Stage != "meeting" ||
 		!strings.Contains(deref(out.Person.CallNotes), "Biscuit") || deref(out.Person.Note) == "" {
@@ -109,7 +111,7 @@ func TestExportPerson(t *testing.T) {
 	if len(out.Enquiries) != 2 || out.Enquiries[0].Message != "Could you send pricing?" || out.Enquiries[1].Message != "Following up on pricing" {
 		t.Fatalf("the export should hold what she wrote to us, matched to her or not: %+v", out.Enquiries)
 	}
-	said := map[string]ExportEvent{}
+	said := map[string]privacy.ExportEvent{}
 	for _, e := range out.History {
 		said[e.Action] = e
 	}

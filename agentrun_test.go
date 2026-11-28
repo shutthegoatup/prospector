@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/agents"
 )
 
 const searchTool = "brave-search_brave_web_search"
@@ -256,7 +257,7 @@ func TestAPersonStopsTheAgent(t *testing.T) {
 		return 200, chatTools(searchTool, `{"query":"more yacht builders"}`)
 	}
 	got := r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, r.agent, "Ada Lovelace")).ID)
-	if got.Status != RunStopped || got.StopReason != "stopped by a person" || got.EndedAt == nil {
+	if got.Status != agents.RunStopped || got.StopReason != "stopped by a person" || got.EndedAt == nil {
 		t.Fatalf("a stopped run: %+v", got)
 	}
 	if fake.chats > 3 {
@@ -287,7 +288,7 @@ func TestARunCarriesOnAfterItsServerStops(t *testing.T) {
 	if got.Status != RunFinished || got.Resumes != 1 || got.Owner != r.a.runOwner() || got.Turns != 8 {
 		t.Fatalf("a run its server left should be carried on, where it was: %+v", got)
 	}
-	if got := r.finished(t, stopped.ID); got.Status != RunStopped {
+	if got := r.finished(t, stopped.ID); got.Status != agents.RunStopped {
 		t.Fatalf("a run a person had stopped shouldn't be carried on: %+v", got)
 	}
 	if got := r.finished(t, held.ID); got.Status != RunWorking || got.Owner != "a live server" {
@@ -637,7 +638,7 @@ func TestRevokingTheAgentsKeyStopsItsRun(t *testing.T) {
 		return 200, chatTools(searchTool, `{"query":"yachts"}`)
 	}
 	got := r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, r.agent, "Ada Lovelace")).ID)
-	if got.Status != RunStopped || !strings.Contains(got.StopReason, "revoked") {
+	if got.Status != agents.RunStopped || !strings.Contains(got.StopReason, "revoked") {
 		t.Fatalf("a run whose key was revoked: %+v", got)
 	}
 }

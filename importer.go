@@ -7,6 +7,9 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/shutthegoatup/prospector/internal/privacy"
+	"github.com/shutthegoatup/prospector/internal/signing"
 )
 
 // Draft is one contact parsed from leads/outreach/*.md. Parsing runs wherever the repo
@@ -37,9 +40,9 @@ type SentLogEntry struct {
 }
 
 type ImportPayload struct {
-	Drafts    []Draft        `json:"drafts"`
-	Companies []CompanyRow   `json:"companies"`
-	SentLog   []SentLogEntry `json:"sent_log"`
+	Drafts    []Draft              `json:"drafts"`
+	Companies []privacy.CompanyRow `json:"companies"`
+	SentLog   []SentLogEntry       `json:"sent_log"`
 }
 
 var (
@@ -73,13 +76,13 @@ func evidence(text, ownDomain string) (string, string) {
 	var urls, phones []string
 	for _, u := range urlRe.FindAllString(text, -1) {
 		u = strings.TrimRight(u, ".;:'\"")
-		if !strings.Contains(u, "linkedin.com/search") && (ownDomain == "" || !strings.Contains(u, ownDomain)) && !contains(urls, u) {
+		if !strings.Contains(u, "linkedin.com/search") && (ownDomain == "" || !strings.Contains(u, ownDomain)) && !signing.Contains(urls, u) {
 			urls = append(urls, u)
 		}
 	}
 	for _, m := range phoneRe.FindAllStringSubmatch(text, -1) {
 		p := strings.Join(strings.Fields(m[1]), " ")
-		if !contains(phones, p) {
+		if !signing.Contains(phones, p) {
 			phones = append(phones, p)
 		}
 	}
@@ -297,7 +300,7 @@ func ReadRepo(repo, ownDomain string) (*ImportPayload, error) {
 		return nil, err
 	}
 	for _, rec := range records[1:] {
-		c := CompanyRow{}
+		c := privacy.CompanyRow{}
 		for i, h := range records[0] {
 			c[h] = rec[i]
 		}

@@ -9,6 +9,8 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/shutthegoatup/prospector/internal/onboarding"
+	"github.com/shutthegoatup/prospector/internal/privacy"
 	"github.com/shutthegoatup/prospector/internal/say"
 )
 
@@ -60,7 +62,7 @@ type Card struct {
 	Contact
 	Name, Title, Status, Number, About, Tel, Text, Copy string
 	State                                               string
-	People                                              []Person
+	People                                              []privacy.Person
 	Badges                                              []Badge
 	Script                                              []Line
 	SourceList                                          []string
@@ -82,7 +84,7 @@ var (
 	notTel      = regexp.MustCompile(`[^+\d]`)
 )
 
-func titleOf(people []Person, name string) string {
+func titleOf(people []privacy.Person, name string) string {
 	for _, p := range people {
 		if p.Name == name {
 			return p.Title
@@ -92,7 +94,7 @@ func titleOf(people []Person, name string) string {
 }
 
 // forPerson re-addresses every message to whoever is chosen in "Send to".
-func forPerson(c Contact, people []Person) Contact {
+func forPerson(c Contact, people []privacy.Person) Contact {
 	to, first := deref(c.SendTo), deref(c.First)
 	if to == "" || first == "" {
 		return c
@@ -242,7 +244,7 @@ var stateRank = map[string]int{"ok": 0, "warn": 1, "stop": 2}
 
 // MakeCard turns one contact due at one step into what the page shows.
 func MakeCard(step string, raw Contact, v Voice, now time.Time, noMail map[string]bool) Card {
-	people := alternates(deref(raw.Person))
+	people := privacy.Alternates(deref(raw.Person))
 	c := forPerson(raw, people)
 	name := displayName(c)
 	title := titleOf(people, name)
@@ -363,7 +365,7 @@ func openLabel(c Contact) *say.Text {
 }
 
 func actorLabel(actor string) say.Sayer {
-	if actor == customerActor {
+	if actor == onboarding.CustomerActor {
 		return say.New("the customer")
 	}
 	if a, ok := strings.CutPrefix(actor, "agent:"); ok {

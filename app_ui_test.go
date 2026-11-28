@@ -13,6 +13,7 @@ import (
 	"testing/fstest"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/tickets"
 )
 
 func noRedirects() *http.Client {
@@ -130,7 +131,7 @@ func TestTheNavSaysWhatTheSidebarShows(t *testing.T) {
 	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	repliedPerson(t, s, o, "Hannah Pryce")
-	must(s.AddEnquiry(o.ID, "form", EnquiryIn{Kind: "support", Name: "Edsger Dijkstra", Email: "edsger@eindhoven.example", Message: "Colours look pale on phones"}))
+	must(s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Kind: "support", Name: "Edsger Dijkstra", Email: "edsger@eindhoven.example", Message: "Colours look pale on phones"}))
 	beta := must(s.CreateOrgWithOwner("", "Beta", must(s.UserByEmail("ada@example.com"))))
 
 	read := func(c *http.Client, header ...string) api.Nav {

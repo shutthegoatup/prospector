@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/shutthegoatup/prospector/internal/onboarding"
 	"github.com/shutthegoatup/prospector/internal/request"
 )
 
@@ -141,7 +142,7 @@ func TestAnOrganisationSpeaksToItsOutsidersInItsLanguage(t *testing.T) {
 		t.Fatal(err)
 	}
 	hannah := must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
-	ob := must(s.StartOnboarding(o.ID, OnboardingIn{Company: *hannah.CompanyID, Name: "Leith site", Start: today()}, "Ada Lovelace"))
+	ob := must(s.StartOnboarding(o.ID, onboarding.OnboardingIn{Company: *hannah.CompanyID, Name: "Leith site", Start: today()}, "Ada Lovelace"))
 	if code, body := call(t, member, "POST", srv.URL+"/o/alpha/api/v1/onboardings/"+itoa(ob.ID)+"/invites", "application/json", map[string]any{"contact": hannah.ID}); code != http.StatusNoContent {
 		t.Fatalf("inviting a customer: %d %s", code, body)
 	}

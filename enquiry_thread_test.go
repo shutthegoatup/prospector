@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/shutthegoatup/prospector/internal/mailer"
+	"github.com/shutthegoatup/prospector/internal/tickets"
 )
 
 func TestAReplyToAnEnquiryIsEmailedAndKept(t *testing.T) {
@@ -18,7 +19,7 @@ func TestAReplyToAnEnquiryIsEmailedAndKept(t *testing.T) {
 	s, srv, member, box := mailSite(t, nil)
 	o := must(s.OrgBySlug("alpha"))
 	// Whoever filled the form in chose every field of it.
-	e := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Name: "Hannah\r\nBcc: victim@elsewhere.example", Email: "hannah@larkmoor.example",
+	e := must(s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Name: "Hannah\r\nBcc: victim@elsewhere.example", Email: "hannah@larkmoor.example",
 		Company: "Larkmoor Yachts", Message: "BUY CHEAP WATCHES at https://spam.example\r\nBcc: victim@elsewhere.example"}))
 	base := srv.URL + "/o/alpha/api/v1/enquiries/" + itoa(e.ID)
 	state := func() Enquiry {
@@ -41,7 +42,7 @@ func TestAReplyToAnEnquiryIsEmailedAndKept(t *testing.T) {
 	if _, list := call(t, member, "GET", srv.URL+"/o/alpha/api/v1/enquiries", "", nil); !strings.Contains(list, `"can_reply":true`) {
 		t.Errorf("the enquiries don't say a reply can be sent from them: %s", list)
 	}
-	for why, text := range map[string]string{"nothing": "  \n ", "too much": strings.Repeat("a", replyLimit+1)} {
+	for why, text := range map[string]string{"nothing": "  \n ", "too much": strings.Repeat("a", tickets.ReplyLimit+1)} {
 		if code, body := call(t, member, "POST", base+"/replies", "application/json", map[string]any{"text": text}); code != http.StatusBadRequest {
 			t.Errorf("a reply of %s: %d %s", why, code, body)
 		}
@@ -69,7 +70,7 @@ func TestAReplyToAnEnquiryIsEmailedAndKept(t *testing.T) {
 	if !strings.Contains(wire, "\r\nReply-To: <ada@example.com>\r\n") {
 		t.Errorf("the mail doesn't say where to answer:\n%s", wire)
 	}
-	if now := state(); now.State != EnquiryWaiting || now.Owner != "Ada Lovelace" {
+	if now := state(); now.State != tickets.EnquiryWaiting || now.Owner != "Ada Lovelace" {
 		t.Errorf("after replying the enquiry is %q, owned by %q", now.State, now.Owner)
 	}
 
@@ -84,7 +85,7 @@ func TestAReplyToAnEnquiryIsEmailedAndKept(t *testing.T) {
 		t.Fatalf("recording their answer: %d %s", code, body)
 	}
 	box.take(t, 0)
-	if now := state(); now.State != EnquiryOpen {
+	if now := state(); now.State != tickets.EnquiryOpen {
 		t.Errorf("after their answer the enquiry is %q", now.State)
 	}
 	code, body = call(t, member, "GET", base+"/messages", "", nil)
@@ -103,7 +104,7 @@ func TestAReplyToAnEnquiryIsEmailedAndKept(t *testing.T) {
 	box.mu.Lock()
 	box.fail = nil
 	box.mu.Unlock()
-	if now := state(); rows() != before || now.State != EnquiryOpen {
+	if now := state(); rows() != before || now.State != tickets.EnquiryOpen {
 		t.Errorf("a failed send left %d rows and the enquiry %q", rows()-before, now.State)
 	}
 	// And doesn't count as having just been sent.
@@ -141,7 +142,7 @@ func TestWhoCanBeRepliedToAndByWhom(t *testing.T) {
 		return secret
 	}
 	reader, replier, outsider := key(o.ID, "read", "enquiries:write"), key(o.ID, "enquiries:reply"), key(other.ID, "read", "enquiries:reply")
-	real := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Name: "Hannah Pryce", Email: "hannah@larkmoor.example", Message: "Do you cover Leith?"}))
+	real := must(s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Name: "Hannah Pryce", Email: "hannah@larkmoor.example", Message: "Do you cover Leith?"}))
 	base := srv.URL + "/o/alpha/api/v1/enquiries/"
 	text := map[string]any{"text": "Yes, we do."}
 
@@ -177,22 +178,22 @@ func TestWhoCanBeRepliedToAndByWhom(t *testing.T) {
 		t.Errorf("the key's reply as mailed: %+v", got.Message)
 	}
 	var now Enquiry
-	if err := s.DB.First(&now, real.ID).Error; err != nil || now.Owner != "" || now.State != EnquiryWaiting {
+	if err := s.DB.First(&now, real.ID).Error; err != nil || now.Owner != "" || now.State != tickets.EnquiryWaiting {
 		t.Errorf("after a key's reply: %+v (%v)", now, err)
 	}
 
 	// Not spam, not an address that isn't one, not someone on the never-contact list.
-	spam := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Name: "Bot", Email: "bot@spam.example", Message: "hello", Trap: "caught"}))
+	spam := must(s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Name: "Bot", Email: "bot@spam.example", Message: "hello", Trap: "caught"}))
 	if !spam.Spam {
 		if err := s.DB.Model(&Enquiry{}).Where("id = ?", spam.ID).Update("spam", true).Error; err != nil {
 			t.Fatal(err)
 		}
 	}
-	two := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Name: "Two", Email: "one@larkmoor.example", Message: "hello"}))
+	two := must(s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Name: "Two", Email: "one@larkmoor.example", Message: "hello"}))
 	if err := s.DB.Model(&Enquiry{}).Where("id = ?", two.ID).Update("email", "one@larkmoor.example, two@elsewhere.example").Error; err != nil {
 		t.Fatal(err)
 	}
-	never := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Name: "Rival", Email: "someone@rival.example", Message: "hello"}))
+	never := must(s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Name: "Rival", Email: "someone@rival.example", Message: "hello"}))
 	o.Settings.NeverContact = "rival.example"
 	if err := s.SaveOrg(o); err != nil {
 		t.Fatal(err)
@@ -221,7 +222,7 @@ func TestNoReplyWithoutAMailServer(t *testing.T) {
 	t.Parallel()
 	s, srv, member, box := mailSite(t, func(a *App) { a.mail = nil })
 	o := must(s.OrgBySlug("alpha"))
-	e := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Name: "Hannah Pryce", Email: "hannah@larkmoor.example", Message: "Do you cover Leith?"}))
+	e := must(s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Name: "Hannah Pryce", Email: "hannah@larkmoor.example", Message: "Do you cover Leith?"}))
 	base := srv.URL + "/o/alpha/api/v1/enquiries/" + itoa(e.ID)
 	if code, body := call(t, member, "POST", base+"/replies", "application/json", map[string]any{"text": "Yes."}); code != http.StatusBadRequest || !strings.Contains(body, "mail isn't set up") {
 		t.Errorf("replying with no mail server: %d %s", code, body)
@@ -255,11 +256,11 @@ func TestRepliesKeepToTheirLimits(t *testing.T) {
 	s, srv, member, box := mailSite(t, nil)
 	o := must(s.OrgBySlug("alpha"))
 	for _, dressed := range []string{"Bob<bob@larkmoor.example>", "bob@larkmoor.example(c)", "\"Bob\" <bob@larkmoor.example>", "a@larkmoor.example,b@larkmoor.example"} {
-		if _, err := s.AddEnquiry(o.ID, "form", EnquiryIn{Name: "Bob", Email: dressed, Message: "hello"}); err == nil {
+		if _, err := s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Name: "Bob", Email: dressed, Message: "hello"}); err == nil {
 			t.Errorf("an enquiry was taken from %q, which is more than an address", dressed)
 		}
 	}
-	e := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Name: "Hannah Pryce", Email: "Hannah@Larkmoor.example", Message: "Do you cover Leith?"}))
+	e := must(s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Name: "Hannah Pryce", Email: "Hannah@Larkmoor.example", Message: "Do you cover Leith?"}))
 	base := srv.URL + "/o/alpha/api/v1/enquiries/" + itoa(e.ID)
 	reply := func(text string) (int, string) {
 		return call(t, member, "POST", base+"/replies", "application/json", map[string]any{"text": text})
@@ -308,7 +309,7 @@ func TestRepliesKeepToTheirLimits(t *testing.T) {
 	if err := s.ErasePerson(o.ID, bob.ID, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.DB.Create(&Enquiry{OrgID: o.ID, Kind: "other", Email: "Bob <bob@larkmoor.example>", Message: "from before addresses were checked", Via: "form", State: EnquiryOpen, CreatedAt: time.Now()}).Error; err != nil {
+	if err := s.DB.Create(&Enquiry{OrgID: o.ID, Kind: "other", Email: "Bob <bob@larkmoor.example>", Message: "from before addresses were checked", Via: "form", State: tickets.EnquiryOpen, CreatedAt: time.Now()}).Error; err != nil {
 		t.Fatal(err)
 	}
 	var old Enquiry
@@ -329,9 +330,9 @@ func TestTheEnquiriesAPIGivesWhatThePageShows(t *testing.T) {
 	s, srv, member, _ := mailSite(t, nil)
 	o := must(s.OrgBySlug("alpha"))
 	known := must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Quay Marine", Email: "hannah@quay.example"}, "Ada Lovelace"))
-	e := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Kind: "sales", Name: "Hannah Pryce", Email: "hannah@quay.example", Message: "What does it cost?"}))
-	must(s.AddEnquiry(o.ID, "form", EnquiryIn{Kind: "support", Email: "omar@reef.example", Message: "It stalls."}))
-	must(s.AddEnquiry(o.ID, "form", EnquiryIn{Email: "bot@spam.example", Trap: "filled"}))
+	e := must(s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Kind: "sales", Name: "Hannah Pryce", Email: "hannah@quay.example", Message: "What does it cost?"}))
+	must(s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Kind: "support", Email: "omar@reef.example", Message: "It stalls."}))
+	must(s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Email: "bot@spam.example", Trap: "filled"}))
 	base := srv.URL + "/o/alpha/api/v1/"
 	if code, body := call(t, member, "POST", base+"enquiries/"+itoa(e.ID)+"/answers", "application/json", map[string]any{"text": "Tuesday suits."}); code != http.StatusCreated {
 		t.Fatalf("recording their answer: %d %s", code, body)

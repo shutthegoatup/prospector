@@ -11,6 +11,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/shutthegoatup/prospector/internal/tickets"
 )
 
 func TestFrontPage(t *testing.T) {
@@ -130,7 +132,7 @@ func TestFrontPageEnquiryForm(t *testing.T) {
 		t.Fatal(err)
 	}
 	sent.Body.Close()
-	rows, err := firstOf(s.Enquiries(o.ID, EnquiryFilter{}, 1))
+	rows, err := firstOf(s.Enquiries(o.ID, tickets.EnquiryFilter{}, 1))
 	if sent.StatusCode != http.StatusOK || err != nil || len(rows) != 1 || rows[0].Kind != "demo" || rows[0].Site != srv.URL {
 		t.Fatalf("the form's enquiry: %d, kept %+v, %v", sent.StatusCode, rows, err)
 	}

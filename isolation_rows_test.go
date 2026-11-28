@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/shutthegoatup/prospector/internal/onboarding"
 	"github.com/shutthegoatup/prospector/internal/paging"
 )
 
@@ -66,15 +67,15 @@ func TestRunsAndMailsStayInTheirOrganisation(t *testing.T) {
 		t.Fatal(err)
 	}
 	reply := EnquiryMessage{OrgID: first.ID, EnquiryID: enquiry.ID, Ours: true, Text: "Thanks", By: "Owner One", CreatedAt: now}
-	onboarding := Onboarding{OrgID: first.ID, CompanyID: company.ID, Name: "Setup"}
+	plan := Onboarding{OrgID: first.ID, CompanyID: company.ID, Name: "Setup"}
 	subscription := Subscription{OrgID: first.ID, CompanyID: company.ID, Name: "Licence", Start: "2020-01-01"}
-	for _, row := range []any{&reply, &onboarding, &subscription} {
+	for _, row := range []any{&reply, &plan, &subscription} {
 		if err := s.DB.Create(row).Error; err != nil {
 			t.Fatal(err)
 		}
 	}
-	step := OnboardingStep{OrgID: first.ID, OnboardingID: onboarding.ID, Seq: 1, Name: "Send files", Who: StepTheirs}
-	grant := CustomerGrant{OrgID: first.ID, OnboardingID: onboarding.ID, ContactID: ann.ID}
+	step := OnboardingStep{OrgID: first.ID, OnboardingID: plan.ID, Seq: 1, Name: "Send files", Who: StepTheirs}
+	grant := CustomerGrant{OrgID: first.ID, OnboardingID: plan.ID, ContactID: ann.ID}
 	for _, row := range []any{&step, &grant} {
 		if err := s.DB.Create(row).Error; err != nil {
 			t.Fatal(err)
@@ -84,7 +85,7 @@ func TestRunsAndMailsStayInTheirOrganisation(t *testing.T) {
 	if err := s.DB.Create(&CustomerLink{OrgID: first.ID, GrantID: grant.ID, TokenHash: hashToken(link), ExpiresAt: now.Add(time.Hour)}).Error; err != nil {
 		t.Fatal(err)
 	}
-	customer := &CustomerAccess{Grant: grant, Org: *first, Onboarding: onboarding, Contact: *ann}
+	customer := &onboarding.CustomerAccess{Grant: grant, Org: *first, Onboarding: plan, Contact: *ann}
 
 	answer := func(v any, err error) any {
 		if err != nil {

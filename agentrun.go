@@ -19,6 +19,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/shutthegoatup/prospector/internal/agents"
 	"github.com/shutthegoatup/prospector/internal/cleantext"
 	"github.com/shutthegoatup/prospector/internal/say"
 )
@@ -309,7 +310,7 @@ func (a *App) drive(ctx context.Context, run *AgentRun) (string, string) {
 				return a.ended(ctx, run, err)
 			}
 			if revoked, err := a.s.KeyRevoked(run.OrgID, bk.ID); noted(err) && revoked {
-				return RunStopped, "its key was revoked on the Agents page"
+				return agents.RunStopped, "its key was revoked on the Agents page"
 			}
 			reply, err := chat.next(ctx)
 			if err != nil && ctx.Err() == nil && passing(err) {
@@ -326,7 +327,7 @@ func (a *App) drive(ctx context.Context, run *AgentRun) (string, string) {
 					waitingSince = time.Now()
 				}
 				if reason, handed := a.handOver(run, cfg, bk, time.Since(waitingSince)+time.Until(until)); handed {
-					return RunStopped, reason
+					return agents.RunStopped, reason
 				}
 				if err := a.wait(ctx, run, until); err != nil {
 					return a.ended(ctx, run, err)
@@ -430,7 +431,7 @@ func (a *App) ended(ctx context.Context, run *AgentRun, err error) (string, stri
 	case now.Owner != run.Owner:
 		return "", ""
 	case now.StopAsked:
-		return RunStopped, "stopped by a person"
+		return agents.RunStopped, "stopped by a person"
 	case ctx.Err() != nil:
 		return "", ""
 	case err == nil:

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/shutthegoatup/prospector/internal/mailer"
+	"github.com/shutthegoatup/prospector/internal/onboarding"
 	"github.com/shutthegoatup/prospector/internal/say"
 )
 
@@ -36,7 +37,7 @@ func (a *App) CustomerLinkMail(ctx context.Context, org *Org, to, token string) 
 		return err
 	}
 	if via == nil || a.base == "" {
-		return errNoCustomerMail
+		return onboarding.ErrNoCustomerMail
 	}
 	lang := org.Settings.WithDefaults().CustomerLanguage
 	return a.deliver(ctx, *via, mailer.Message{To: to, Subject: say.Errorf("%s: your onboarding steps", org.Name).In(lang),
@@ -59,7 +60,7 @@ func (a *App) customerRender(w http.ResponseWriter, r *http.Request, code int, v
 	customerHeaders(w)
 	shown := customerShown{Page: "customer", State: v.State, Token: v.Token, Org: v.Org, Email: v.Email, Day: v.Day, Steps: []customerStepShown{}}
 	for _, st := range v.Steps {
-		shown.Steps = append(shown.Steps, customerStepShown{st.ID, st.Name, st.Due, st.DoneOn, st.DoneBy == customerActor})
+		shown.Steps = append(shown.Steps, customerStepShown{st.ID, st.Name, st.Due, st.DoneOn, st.DoneBy == onboarding.CustomerActor})
 	}
 	writeShell(w, languageFor(r, v.Lang), code, shown, "This page needs a browser with JavaScript.\n")
 }
@@ -129,7 +130,7 @@ func (a *App) customerOpen(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.SetCookie(w, &http.Cookie{Name: customerCookie, Value: session, Path: "/c", HttpOnly: true, Secure: a.secure(r),
-		SameSite: http.SameSiteLaxMode, Expires: time.Now().Add(customerSessionLife)})
+		SameSite: http.SameSiteLaxMode, Expires: time.Now().Add(onboarding.CustomerSessionLife)})
 	customerHeaders(w)
 	http.Redirect(w, r, "/c", http.StatusSeeOther)
 }
@@ -157,7 +158,7 @@ func (a *App) customerAgain(w http.ResponseWriter, r *http.Request) {
 	a.customerRender(w, r, http.StatusOK, CustomerView{State: "sent"})
 }
 
-func (a *App) customerSession(r *http.Request) (*CustomerAccess, string) {
+func (a *App) customerSession(r *http.Request) (*onboarding.CustomerAccess, string) {
 	c, err := r.Cookie(customerCookie)
 	if err != nil {
 		return nil, ""
@@ -197,7 +198,7 @@ func (a *App) customerLeave(w http.ResponseWriter, r *http.Request) {
 
 // CustomerControls fills in, for the members' pages, who has been let see each
 // onboarding and who at its company could be: anyone picked, with an email address.
-func (a *App) CustomerControls(org int64, rows []OnboardingRow) error {
+func (a *App) CustomerControls(org int64, rows []onboarding.OnboardingRow) error {
 	if len(rows) == 0 {
 		return nil
 	}
@@ -231,7 +232,7 @@ func (a *App) customerStep(done bool) http.HandlerFunc {
 		acc, _ := a.customerSession(r)
 		if acc != nil {
 			id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
-			if err := a.s.CustomerSetStep(acc.Grant.OrgID, acc, id, done); err != nil && !errors.Is(err, errNoCustomer) {
+			if err := a.s.CustomerSetStep(acc.Grant.OrgID, acc, id, done); err != nil && !errors.Is(err, onboarding.ErrNoCustomer) {
 				log.Print(err)
 				http.Error(w, "that couldn't be saved", http.StatusInternalServerError)
 				return

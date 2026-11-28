@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/shutthegoatup/prospector/internal/paging"
+	"github.com/shutthegoatup/prospector/internal/sales"
 )
 
 // person adds someone at a company with an address, in conversation unless cold.
@@ -92,10 +93,10 @@ func TestACampaignGoesOnlyToPeopleWithARelationship(t *testing.T) {
 	if err := s.DB.First(&hannah, people[0].ContactID).Error; err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.AddSubscription(o.ID, SubscriptionIn{Company: *hannah.CompanyID, Name: "Standard plan", Start: "2026-01-12", TermMonths: 12}, "Ada Lovelace"); err != nil {
+	if _, err := s.AddSubscription(o.ID, sales.SubscriptionIn{Company: *hannah.CompanyID, Name: "Standard plan", Start: "2026-01-12", TermMonths: 12}, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.AddSubscription(o.ID, SubscriptionIn{Company: *declined.CompanyID, Name: "Old plan", Start: "2020-01-01", TermMonths: 12, Then: ThenEnds}, "Ada Lovelace"); err != nil {
+	if _, err := s.AddSubscription(o.ID, sales.SubscriptionIn{Company: *declined.CompanyID, Name: "Old plan", Start: "2020-01-01", TermMonths: 12, Then: ThenEnds}, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
 	c = must(s.ChangeCampaign(o.ID, c.ID, []Change{{Field: "audience", Value: AudienceCustomers}}, "Ada Lovelace"))
@@ -246,7 +247,7 @@ func TestTheAudienceHoldsAtItsEdges(t *testing.T) {
 	}
 
 	later := person(t, s, o, "Not Yet", "Quayside Ltd", "notyet@quayside.example", false)
-	if _, err := s.AddSubscription(o.ID, SubscriptionIn{Company: *later.CompanyID, Name: "Starts later", Start: "2099-01-01", TermMonths: 12}, "Ada Lovelace"); err != nil {
+	if _, err := s.AddSubscription(o.ID, sales.SubscriptionIn{Company: *later.CompanyID, Name: "Starts later", Start: "2099-01-01", TermMonths: 12}, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
 	c = must(s.ChangeCampaign(o.ID, c.ID, []Change{{Field: "audience", Value: AudienceCustomers}}, "Ada Lovelace"))
