@@ -188,7 +188,7 @@ func editedBy(tx *gorm.DB, org, contact int64, field, kind string) (string, erro
 	var last store.Event
 	err := tx.Where("org_id = ? and contact_id = ? and action in ?", org, contact, []string{store.SetField.Of(field).String(), store.Drafted.Of(kind).String()}).
 		Order("at desc, id desc").First(&last).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) || err == nil && last.Action != "set:"+field {
+	if errors.Is(err, gorm.ErrRecordNotFound) || err == nil && last.Action != store.SetField.Of(field).String() {
 		return "", nil
 	}
 	return last.User, err
