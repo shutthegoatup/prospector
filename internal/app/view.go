@@ -9,6 +9,8 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/shutthegoatup/prospector/internal/cleantext"
+
 	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/onboarding"
 	"github.com/shutthegoatup/prospector/internal/privacy"
@@ -353,7 +355,7 @@ func profileHref(c store.Contact) string {
 		return u
 	}
 	name, _, _ := strings.Cut(store.Deref(c.Person), ",")
-	words := strings.Join(strings.Fields(name+" "+store.Deref(c.Maker)), " ")
+	words := cleantext.OneLine(name + " " + store.Deref(c.Maker))
 	if words == "" {
 		return "#"
 	}

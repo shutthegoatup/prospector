@@ -12,6 +12,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/shutthegoatup/prospector/internal/cleantext"
+
 	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/shutthegoatup/prospector/api"
@@ -198,7 +200,7 @@ func againstSpec(op *openapi3.Operation, problem *openapi3.Schema, status int, h
 		return "a Problem that isn't JSON"
 	}
 	if err := problem.VisitJSON(v); err != nil {
-		return "a Problem the spec doesn't describe: " + oneLine(err.Error())
+		return "a Problem the spec doesn't describe: " + cleantext.OneLine(err.Error())
 	}
 	return ""
 }

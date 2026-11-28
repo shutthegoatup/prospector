@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/shutthegoatup/prospector/internal/cleantext"
+
 	"github.com/shutthegoatup/prospector/api"
 )
 
@@ -131,7 +133,7 @@ func TestEveryLimitedOperationDeclaresThrottled(t *testing.T) {
 		}
 	}
 	want := fmt.Sprintf("a key may make %d at once and then %v a second, a person %d at once and then %v a second", keyRate.burst, keyRate.perSecond, memberRate.burst, memberRate.perSecond)
-	if !strings.Contains(strings.Join(strings.Fields(spec.Info.Description), " "), want) {
+	if !strings.Contains(cleantext.OneLine(spec.Info.Description), want) {
 		t.Errorf("the spec's description should state the limits as the server has them:\n%s", want)
 	}
 }

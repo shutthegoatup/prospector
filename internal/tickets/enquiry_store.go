@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/shutthegoatup/prospector/internal/cleantext"
+
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
@@ -335,7 +337,7 @@ func (s *EnquiryStore) enquiryCompany(org int64, e store.Enquiry) (string, error
 		}
 		return co.Name, nil
 	}
-	typed := store.Clip(strings.Join(strings.Fields(e.Company), " "), 80)
+	typed := store.Clip(cleantext.OneLine(e.Company), 80)
 	if typed == "" {
 		return "", nil
 	}

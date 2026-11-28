@@ -6,6 +6,8 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/shutthegoatup/prospector/internal/cleantext"
+
 	"github.com/shutthegoatup/prospector/internal/say"
 )
 
@@ -21,7 +23,7 @@ var errNotDraft = say.New("only a draft agreement can be changed")
 var ErrTampered = say.New("the document doesn't match the SHA-256 it was kept with")
 
 func agreementName(name string) (string, error) {
-	name = strings.Join(strings.Fields(name), " ")
+	name = cleantext.OneLine(name)
 	switch {
 	case name == "":
 		return "", say.New("an agreement needs a name")

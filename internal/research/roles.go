@@ -4,6 +4,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/shutthegoatup/prospector/internal/cleantext"
+
 	"gorm.io/gorm"
 
 	"github.com/shutthegoatup/prospector/internal/crm"
@@ -33,7 +35,7 @@ type RoleIn struct {
 }
 
 func (in *RoleIn) check(needSource bool) error {
-	in.Title, in.SourceURL, in.Details = strings.TrimSpace(in.Title), strings.TrimSpace(in.SourceURL), strings.Join(strings.Fields(in.Details), " ")
+	in.Title, in.SourceURL, in.Details = strings.TrimSpace(in.Title), strings.TrimSpace(in.SourceURL), cleantext.OneLine(in.Details)
 	switch {
 	case in.Title == "":
 		return say.New("a role needs a title")
@@ -87,7 +89,7 @@ func sameRole(tx *gorm.DB, org, offering, company int64, in RoleIn) (*store.Role
 	return nil, nil
 }
 
-func sameWords(s string) string { return strings.ToLower(strings.Join(strings.Fields(s), " ")) }
+func sameWords(s string) string { return strings.ToLower(cleantext.OneLine(s)) }
 
 // junkedSaid is what an agent is told when it brings back a role that was junked.
 func junkedSaid(r store.Role) *say.Text {

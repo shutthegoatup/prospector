@@ -8,6 +8,8 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/shutthegoatup/prospector/internal/cleantext"
+
 	"github.com/shutthegoatup/prospector/internal/privacy"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
@@ -81,7 +83,7 @@ func evidence(text, ownDomain string) (string, string) {
 		}
 	}
 	for _, m := range phoneRe.FindAllStringSubmatch(text, -1) {
-		p := strings.Join(strings.Fields(m[1]), " ")
+		p := cleantext.OneLine(m[1])
 		if !slices.Contains(phones, p) {
 			phones = append(phones, p)
 		}

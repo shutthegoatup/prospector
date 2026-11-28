@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/shutthegoatup/prospector/internal/cleantext"
+
 	"github.com/shutthegoatup/prospector/api"
 )
 
@@ -99,7 +101,7 @@ func llmsTxt(doc APIDoc, base string) string {
 		for _, o := range g.Ops {
 			fmt.Fprintf(&b, "- [%s %s](%s/api#%s)", o.Method, o.Path, base, opAnchor(o))
 			if o.Summary != "" {
-				b.WriteString(": " + strings.Join(strings.Fields(o.Summary), " "))
+				b.WriteString(": " + cleantext.OneLine(o.Summary))
 			}
 			b.WriteString("\n")
 		}
