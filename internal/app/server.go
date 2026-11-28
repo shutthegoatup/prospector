@@ -18,8 +18,10 @@ import (
 
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/cleantext"
+	"github.com/shutthegoatup/prospector/internal/hooks"
 	"github.com/shutthegoatup/prospector/internal/identity"
 	"github.com/shutthegoatup/prospector/internal/mailer"
+	"github.com/shutthegoatup/prospector/internal/marketing"
 	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
@@ -139,6 +141,11 @@ func publicURL(raw string) (string, error) {
 		return "", fmt.Errorf("PROSPECTOR_URL should look like https://prospector.example.com, not %q", raw)
 	}
 	return u.Scheme + "://" + u.Host, nil
+}
+
+// hookProviders are the services that post to /hooks/{name}.
+func (a *App) hookProviders() map[string]hooks.Provider {
+	return map[string]hooks.Provider{"postmark": marketing.PostmarkHook{Mail: &a.s.OutreachStore}}
 }
 
 func (a *App) session(r *http.Request) (*store.Session, *store.User) {
@@ -279,7 +286,7 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("GET /login/callback", a.loginCallback)
 	mux.HandleFunc("GET /u/{token}", a.unsubscribePage)
 	mux.HandleFunc("POST /u/{token}", a.unsubscribe)
-	mux.HandleFunc("POST /hooks/postmark", a.postmarkHook)
+	mux.HandleFunc("POST /hooks/{provider}", hooks.Handler(a.hookProviders()))
 	mux.HandleFunc("GET /c", a.customerPage)
 	mux.HandleFunc("POST /c/leave", a.customerLeave)
 	mux.HandleFunc("POST /c/steps/{id}/done", a.customerStep(true))
@@ -319,7 +326,8 @@ func (a *App) Routes() http.Handler {
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		a.setDeadlines(w, r)
-		if !cleantext.Request(r) {
+		// A webhook is verified over its body as it came; hooks cleans it once it is.
+		if !strings.HasPrefix(r.URL.Path, "/hooks/") && !cleantext.Request(r) {
 			refuseAs(w, r, http.StatusNotFound, "404 page not found")
 			return
 		}
