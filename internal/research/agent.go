@@ -146,7 +146,7 @@ type AddContactOut struct {
 // samePerson finds someone already at the company by profile, address or name, so a
 // second suggestion of them doesn't become a second row to be contacted twice.
 func samePerson(people []store.Contact, in prospecting.AddContactIn) *store.Contact {
-	link, email, name := store.LinkedinPath(in.Linkedin), strings.ToLower(strings.TrimSpace(in.Email)), strings.ToLower(store.PersonKey(in.Name))
+	link, email, name := store.LinkedinPath(in.Linkedin), store.EmailKey(in.Email), strings.ToLower(store.PersonKey(in.Name))
 	for i, p := range people {
 		if link != "" && store.LinkedinPath(store.Deref(p.Linkedin)) == link ||
 			email != "" && strings.ToLower(store.Deref(p.Email)) == email ||

@@ -205,7 +205,7 @@ func (s *OutreachStore) audience(o *store.Org, c store.Campaign, w *audienceWork
 					return nil, why
 				}
 				r.LeftOut = because
-			} else if w.noMail[MailDomainOf(addr)] {
+			} else if w.noMail[store.AddressDomain(addr)] {
 				r.LeftOut = say.New("its domain takes no mail")
 			} else {
 				seen[addr] = r.Name

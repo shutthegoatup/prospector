@@ -164,7 +164,7 @@ func (a *App) keepFind(o *store.Org, who store.Actor, c store.Contact, field, ki
 	if field == "phone" && phoneLooksWrong(value) {
 		return EnrichAsked{Field: field, Vendor: kind, Outcome: "skipped", Detail: "it isn't a number that can be called"}
 	}
-	if field == "email" && s.TakesMail(context.Background(), marketing.MailDomainOf(value)) == marketing.MailRefused {
+	if field == "email" && s.TakesMail(context.Background(), store.AddressDomain(value)) == marketing.MailRefused {
 		return EnrichAsked{Field: field, Vendor: kind, Outcome: "skipped", Detail: "its domain takes no mail"}
 	}
 	made, err := s.KeepFind(o.ID, who, c.ID, field, kind, value, status)

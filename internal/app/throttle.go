@@ -1,7 +1,6 @@
 package app
 
 import (
-	"strings"
 	"sync"
 	"time"
 
@@ -43,7 +42,7 @@ func (g *loginGuard) clock() time.Time {
 }
 
 // loginKey is a hash so that a huge email field can't be held in memory.
-func loginKey(email string) string { return store.HashToken(strings.ToLower(strings.TrimSpace(email))) }
+func loginKey(email string) string { return store.HashToken(store.EmailKey(email)) }
 
 // loginWait doubles with each failure past the free ones, up to maxLoginWait.
 func loginWait(failures int) time.Duration {

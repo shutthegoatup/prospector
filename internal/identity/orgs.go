@@ -245,5 +245,5 @@ func DeviceMAC(u *store.User, nonce string) string {
 // The guard counts under names that say what is being guessed at, so the sign-in
 // form, whatever is typed into it, can't reach the count for anything else.
 func SignInBucket(email string) string {
-	return "sign-in\x00" + strings.ToLower(strings.TrimSpace(email))
+	return "sign-in\x00" + store.EmailKey(email)
 }

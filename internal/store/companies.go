@@ -36,7 +36,7 @@ var Stages = []struct{ Key, Label string }{
 // matches by loose substring, because the list also hides people from the queues and
 // a stray word must not hide the wrong ones.
 func (set OrgSettings) Listed(email, link string) error {
-	email, profile := strings.ToLower(strings.TrimSpace(email)), LinkedinPath(link)
+	email, profile := EmailKey(email), LinkedinPath(link)
 	for _, raw := range strings.FieldsFunc(strings.ToLower(set.NeverContact), func(r rune) bool { return r == ',' || r == '\n' || r == ' ' }) {
 		entry := strings.TrimRight(strings.TrimPrefix(SchemeRe.ReplaceAllString(strings.TrimSpace(raw), ""), "www."), "/")
 		if entry == "" {

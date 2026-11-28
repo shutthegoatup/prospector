@@ -119,7 +119,7 @@ func (a *App) ssoStart(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login/sso?"+url.Values{"email": {query.Get("email")}, "next": {query.Get("next")}}.Encode(), http.StatusSeeOther)
 		return
 	}
-	email := strings.ToLower(strings.TrimSpace(query.Get("email")))
+	email := store.EmailKey(query.Get("email"))
 	org, err := a.s.OrgBySlug(query.Get("org"))
 	var sso *store.SSO
 	if err == nil {
@@ -246,7 +246,7 @@ func (a *App) finishSSO(w http.ResponseWriter, r *http.Request, att attempt, ref
 		err = errWrongDomain
 	// Anyone can open a Google account under an address they read mail at; hd says
 	// the organisation's own Workspace holds this one.
-	case who.Issuer == googleIssuer && who.HostedBy != store.EmailDomain(email):
+	case who.Issuer == googleIssuer && who.HostedBy != store.AddressDomain(email):
 		err = errWrongDomain
 	}
 	if err != nil {

@@ -65,7 +65,7 @@ func TestWhetherADomainTakesMail(t *testing.T) {
 			t.Errorf("%s: %v, want %v", domain, got, want)
 		}
 	}
-	if got := marketing.MailDomainOf("kai@Bücher.Example."); got != "xn--bcher-kva.example" {
+	if got := store.AddressDomain("kai@Bücher.Example."); got != "xn--bcher-kva.example" {
 		t.Errorf("an international domain is asked about as %q", got)
 	}
 }
