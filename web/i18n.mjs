@@ -45,13 +45,17 @@ const shape = (message) => {
     }
   };
   walk(parse(message));
-  return [...out].sort().join(" ");
+  return [...out].toSorted().join(" ");
 };
 let wrong = 0;
 for (const l of locales.translated) {
   const file = `lang/${l}.json`;
   const said = JSON.parse(await readFile(file, "utf8"));
-  const kept = Object.fromEntries(Object.entries(said).filter(([id]) => id in english).sort(([a], [b]) => (a < b ? -1 : 1)));
+  const kept = Object.fromEntries(
+    Object.entries(said)
+      .filter(([id]) => id in english)
+      .toSorted(([a], [b]) => (a < b ? -1 : 1)),
+  );
   for (const [id, text] of Object.entries(kept)) {
     let got;
     try {
