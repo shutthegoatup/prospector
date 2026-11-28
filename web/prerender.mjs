@@ -1,8 +1,9 @@
 // Writes the public site's pages, rendered by React when the app is built, into the
-// embedded assets/app: the front page (site.html) and the /api reference (api.html).
+// embedded assets/app: the front page in each language (site.<locale>.html) and the
+// /api reference (api.html), which is in English like the spec it is built from.
 // Search engines, link previews and readers without script get the whole page; the
 // front page's script only adds its enquiry form.
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { apiReference, landing, pricing } from "./site-build/render.js";
 
 const head = (title, description, styles) =>
@@ -17,8 +18,8 @@ const head = (title, description, styles) =>
     ...["fonts", ...styles].map((css) => `<link rel="stylesheet" href="/assets/css/${css}.css" />`),
   ].join("\n    ");
 
-const page = (headHTML, bodyClass, root) => `<!DOCTYPE html>
-<html lang="en">
+const page = (lang, headHTML, bodyClass, root) => `<!DOCTYPE html>
+<html lang="${lang}">
   <head>
     ${headHTML}
   </head>
@@ -30,22 +31,29 @@ const page = (headHTML, bodyClass, root) => `<!DOCTYPE html>
 
 const site = "overflow-x-clip bg-background font-sans text-[17px] leading-[1.6] text-foreground antialiased";
 
-await writeFile(
-  "../assets/app/site.html",
-  page(
-    head(
-      "Prospector · A few hundred accounts, one queue a day",
-      `A prospecting and customer workbench for small teams selling to named accounts: research, deals, agreements, subscriptions and onboarding on one company record. Agents research and draft; you decide what they may send. ${pricing}`,
-      ["output"],
-    ) + `\n    <script type="module" src="/assets/app/site.js"></script>`,
-    site,
-    `<div id="site">${landing()}</div>`,
-  ),
-);
+const locales = JSON.parse(await readFile("locales.json", "utf8"));
+const attr = (text) => text.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
+
+for (const locale of [locales.source, ...locales.translated, ...locales.pseudo]) {
+  const messages = locale === locales.source ? {} : JSON.parse(await readFile(`src/lang/site/${locale}.json`, "utf8"));
+  const front = landing(locale, messages);
+  // The prices are hosted terms, and stay English: only the English description says them.
+  await writeFile(
+    `../assets/app/site.${locale}.html`,
+    page(
+      locale,
+      head(attr(front.title), attr(locale === locales.source ? `${front.description} ${pricing}` : front.description), ["output"]) +
+        `\n    <script type="module" src="/assets/app/site.js"></script>`,
+      site,
+      `<div id="site">${front.html}</div>`,
+    ),
+  );
+}
 
 await writeFile(
   "../assets/app/api.html",
   page(
+    "en",
     head(
       "Prospector API · The contract",
       "Everything Prospector does, as an HTTP API for people and robots alike: agents, runs and more, with the OpenAPI spec to build against.",
@@ -55,4 +63,4 @@ await writeFile(
     apiReference(),
   ),
 );
-console.log("wrote assets/app/site.html and assets/app/api.html");
+console.log("wrote assets/app/site.<locale>.html and assets/app/api.html");

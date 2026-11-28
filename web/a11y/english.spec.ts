@@ -6,7 +6,7 @@ import { base, member, org, reader, seed } from "./world.ts";
 
 // In en-XA every word the app says is accented and bracketed, so plain letters left on a
 // page are words that never went through react-intl. A page is checked once its file is
-// off .oxlintrc.json's list of those still to be translated.
+// off .oxlintrc.json's list of those still to be translated (or kept English, as /api is).
 const untranslated = new Set<string>(
   (JSON.parse(readFileSync(new URL("../.oxlintrc.json", import.meta.url), "utf8")) as { overrides: { files: string[] }[] }).overrides.flatMap((o) => o.files),
 );
@@ -42,11 +42,14 @@ const products = [
   "OpenID Connect",
   "SearXNG",
   "LinkedIn",
+  "GitHub",
 ];
 const languages = ["en-GB", "en-XA"].map((l) => new Intl.DisplayNames([l], { type: "language" }).of(l) ?? l);
 
 const allowed = [
   "Prospector",
+  // The front page's example agent.
+  "research-agent",
   ...products,
   ...languages,
   ...addresses,
@@ -79,7 +82,7 @@ async function orgWords(tab: Page) {
 const identifiers = [
   /\S+:\/\/\S+/g,
   /\S+@\S+\.\S+/g,
-  /\b[\w-]+(?:\.[\w-]+)*\.(?:example|com)\b/g,
+  /\b[\w-]+(?:\.[\w-]+)*\.(?:example|com)\b(?:\/\S*)?/g,
   /\b(?:GET|POST|PUT|PATCH|DELETE) \S+/g,
   /\b[a-z]+(?:[:_][a-z]+)+\b/g,
   /\{\w+\}/g,
@@ -100,10 +103,11 @@ async function said(tab: Page, scope: string): Promise<string[]> {
     const page = document.documentElement.lang;
     const shown = (el: Element) =>
       !el.closest("[aria-hidden=true]") && (el.closest("[lang]")?.getAttribute("lang") ?? page) === page && el.checkVisibility({ visibilityProperty: true });
+    // Code, keys and sample output are machine text, not words to translate.
     const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     for (let n = walk.nextNode(); n; n = walk.nextNode()) {
       const el = n.parentElement;
-      if (el && !el.closest("script, style") && (el.closest("option") || shown(el)) && n.textContent?.trim()) out.push(n.textContent.trim());
+      if (el && !el.closest("script, style, code, kbd, samp") && (el.closest("option") || shown(el)) && n.textContent?.trim()) out.push(n.textContent.trim());
     }
     for (const el of [root, ...root.querySelectorAll("*")]) {
       if (!shown(el)) continue;
@@ -203,6 +207,15 @@ test.describe("signed out", () => {
     await expect(tab.getByRole("alert")).toBeVisible();
     await inPseudo(tab, "body");
   });
+});
+
+// The front page is built in each language; its form is drawn by its own script, in the
+// page's. Its prices are marked English, and the API reference is all English like the spec.
+test("the front page, with its form", async ({ page: tab }) => {
+  test.skip(!translated("src/site/Landing.tsx"), "Landing.tsx is still to be translated");
+  await tab.goto("/");
+  await expect(tab.locator("#enquiry form")).toBeVisible();
+  await inPseudo(tab, "body");
 });
 
 test.describe("served", () => {

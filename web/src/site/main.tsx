@@ -1,6 +1,11 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { RawIntlProvider } from "react-intl";
+import { intl, speak, type Messages } from "@/i18n";
 import { EnquiryForm } from "./Landing";
+
+// Only the site's share of each catalogue (i18n.mjs), each its own chunk.
+const catalogs = import.meta.glob<Messages>("../lang/site/*.json", { import: "default" });
 
 // The front page is built as HTML; this script only brings its enquiry form, and the
 // server loads it only where it has somewhere for the form to send. The form shows only
@@ -16,9 +21,16 @@ if (site && mount) {
     intake = "";
   }
   if (intake) {
+    // The page was built in its language (prerender.mjs); the form speaks it too, or
+    // English if its messages can't be fetched.
+    const lang = document.documentElement.lang;
+    const messages = await catalogs[`../lang/site/${lang}.json`]?.().catch(() => undefined);
+    if (messages) speak(lang, messages);
     createRoot(mount).render(
       <StrictMode>
-        <EnquiryForm intake={intake} nav={document.getElementById("site-links")} plans={[...document.querySelectorAll<HTMLElement>("[data-plan-cta]")]} />
+        <RawIntlProvider value={intl}>
+          <EnquiryForm intake={intake} nav={document.getElementById("site-links")} plans={[...document.querySelectorAll<HTMLElement>("[data-plan-cta]")]} />
+        </RawIntlProvider>
       </StrictMode>,
     );
   }

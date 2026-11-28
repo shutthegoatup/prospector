@@ -1,8 +1,15 @@
 import type { ComponentProps, ReactNode } from "react";
+import { defineMessages, useIntl } from "react-intl";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+
+const m = defineMessages({
+  footer: { defaultMessage: "Footer", id: "ahPhRQ", description: "Accessible name of the public site's footer links." },
+});
+
+const brand = "Prospector.";
 
 // The public site's look, on the app's shadcn components: ink edges, offset shadows in
 // the section's colour, chunky buttons that lift on hover.
@@ -104,7 +111,10 @@ export function Terminal({ title, children, className }: { title: string; childr
       <div className="border-b border-sidebar-border px-[18px] py-3">
         <Eyebrow className="text-[#b9b0a0]">{title}</Eyebrow>
       </div>
-      <div className="overflow-x-auto px-[18px] py-5 font-mono text-sm leading-7 whitespace-nowrap [&_b]:font-normal [&_b]:text-primary [&_b]:select-none [&_i]:not-italic [&_i]:text-chart-2 [&>span]:block">
+      <div
+        lang="en"
+        className="overflow-x-auto px-[18px] py-5 font-mono text-sm leading-7 whitespace-nowrap [&_b]:font-normal [&_b]:text-primary [&_b]:select-none [&_i]:not-italic [&_i]:text-chart-2 [&>span]:block"
+      >
         {children}
       </div>
     </Panel>
@@ -115,18 +125,19 @@ export function Brand({ light }: { light?: boolean }) {
   return (
     <a className={cn("flex items-center gap-2.5 font-heading text-[21px] font-bold tracking-[-0.01em]", light && "text-background")} href="/">
       <img src="/assets/img/mark.svg" width={30} height={30} alt="" />
-      <span>Prospector.</span>
+      <span>{brand}</span>
     </a>
   );
 }
 
 export function Footer({ blurb, children }: { blurb: ReactNode; children: ReactNode }) {
+  const say = useIntl().formatMessage;
   return (
     <footer className="bg-sidebar text-[#b9b0a0]">
       <Wrap className="flex flex-wrap items-center gap-x-7 gap-y-4 py-7 text-sm">
         <Brand light />
         <span>{blurb}</span>
-        <nav aria-label="Footer" className="flex flex-wrap gap-6 md:ml-auto [&_a:hover]:text-background">
+        <nav aria-label={say(m.footer)} className="flex flex-wrap gap-6 md:ml-auto [&_a:hover]:text-background">
           {children}
         </nav>
       </Wrap>

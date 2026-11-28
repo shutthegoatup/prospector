@@ -3,6 +3,7 @@ package main
 import (
 	"io"
 	"net/http"
+	"net/http/cookiejar"
 	"strings"
 	"testing"
 
@@ -178,5 +179,54 @@ func TestAnOrganisationSpeaksToItsOutsidersInItsLanguage(t *testing.T) {
 	}
 	if got, _ := inLanguage(t, outsider, srv.URL+"/u/never-made", "ja"); got != request.Locales.Source {
 		t.Errorf("an unsubscribe link that was never made: %s", got)
+	}
+}
+
+// The front page is built once in each language, and served in the visitor's: there is
+// no organisation to fall back on, so the source after their browser's.
+func TestTheFrontPageIsInTheVisitorsLanguage(t *testing.T) {
+	_, _, srv, _ := signedIn(t)
+	pseudo := request.Locales.Pseudo[0]
+
+	jar, _ := cookiejar.New(nil)
+	visitor := &http.Client{Jar: jar}
+	res, err := visitor.Get(srv.URL + "/?lang=" + pseudo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	body := string(b)
+	if !strings.Contains(body, `<html lang="`+pseudo+`">`) || strings.Contains(body, "One queue a day.") {
+		t.Fatalf("/?lang=%s didn't serve the front page built in it", pseudo)
+	}
+	if got := res.Header.Get("Content-Language"); got != pseudo || !strings.Contains(res.Header.Get("Vary"), "Accept-Language, Cookie") {
+		t.Errorf("Content-Language %q, Vary %q", got, res.Header.Get("Vary"))
+	}
+	// The hosted terms stay English, and say so.
+	start := strings.Index(body, `id="pricing"`)
+	if start < 0 {
+		t.Fatal("the front page has no pricing section")
+	}
+	pricing := body[start : start+strings.Index(body[start:], "</section>")]
+	if !strings.Contains(pricing, "prices exclude VAT") || !strings.Contains(pricing, `lang="en"`) {
+		t.Error("the prices aren't kept in English, marked as such")
+	}
+	if got, _ := inLanguage(t, visitor, srv.URL+"/", ""); got != pseudo {
+		t.Errorf("the language picked isn't kept: %s", got)
+	}
+	if got, _ := inLanguage(t, visitor, srv.URL+"/?lang=", ""); got != request.Locales.Source {
+		t.Errorf("?lang= doesn't forget the language picked: %s", got)
+	}
+
+	translatedInto(t, pseudo)
+	if got, _ := inLanguage(t, &http.Client{}, srv.URL+"/", pseudo+", en;q=0.5"); got != pseudo {
+		t.Errorf("a browser asking for %s: %s", pseudo, got)
+	}
+	if got, _ := inLanguage(t, &http.Client{}, srv.URL+"/", "ja"); got != request.Locales.Source {
+		t.Errorf("a browser asking for a language the site isn't in: %s", got)
+	}
+	if got, _ := inLanguage(t, &http.Client{}, srv.URL+"/api", pseudo); got != "en" {
+		t.Errorf("the API reference, in English like the spec, says it is in %s", got)
 	}
 }

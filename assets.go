@@ -18,7 +18,7 @@ var assetFS embed.FS
 
 // webBuilt reports whether the binary was built after the web app, which writes these.
 func webBuilt(fsys fs.FS) error {
-	for _, name := range []string{"app/index.html", "app/site.html", "app/site.js", "app/api.html", "js/pdf.worker.min.mjs"} {
+	for _, name := range []string{"app/index.html", "app/site.en-GB.html", "app/site.js", "app/api.html", "js/pdf.worker.min.mjs"} {
 		if _, err := fs.Stat(fsys, "assets/"+name); err != nil {
 			return fmt.Errorf("built without the web app (no assets/%s): run `npm ci && npm run build` in web/, then build again", name)
 		}
