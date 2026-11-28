@@ -442,7 +442,7 @@ func TestTodayPointsAtDealsThatNeedANextStep(t *testing.T) {
 	if err := s.ChangeDeal(o.ID, renewal.ID, "stage", "proposal", "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	for field, value := range map[string]string{"next_step": "Send renewal terms", "next_date": "2999-01-01"} {
+	for field, value := range map[string]string{"next_step": "Send renewal terms", "next_date": "2199-01-01"} {
 		if err := s.ChangeDeal(o.ID, renewal.ID, field, value, "Ada Lovelace"); err != nil {
 			t.Fatal(err)
 		}

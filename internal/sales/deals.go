@@ -1,8 +1,6 @@
 package sales
 
 import (
-	"time"
-
 	"gorm.io/gorm"
 
 	"github.com/shutthegoatup/prospector/internal/say"
@@ -43,8 +41,8 @@ func dealChange(tx *gorm.DB, org int64, d store.Deal, currency, field, value str
 			break
 		}
 		if value != "" {
-			if _, err := time.Parse("2006-01-02", value); err != nil {
-				return nil, "", say.Errorf("%q isn't a date", value)
+			if _, err := store.ParseDay(value); err != nil {
+				return nil, "", err
 			}
 		}
 		return map[string]any{field: store.NonEmpty(value)}, value, nil

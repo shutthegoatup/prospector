@@ -30,7 +30,7 @@ func heldAs(tx *gorm.DB, org int64, c *store.Company, stage string) (string, err
 	if err := tx.Where("org_id = ? and company_id = ?", org, c.ID).Find(&subs).Error; err != nil {
 		return "", err
 	}
-	today := time.Now().Format(store.DayLayout)
+	today := time.Now().Format(time.DateOnly)
 	for _, sub := range subs {
 		if sub.On(today).Status != store.SubEnded {
 			return HeldCustomer, nil

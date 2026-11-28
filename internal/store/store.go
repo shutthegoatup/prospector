@@ -283,7 +283,7 @@ func Logged(res *gorm.DB) error {
 	return res.Error
 }
 
-func Today() string { return time.Now().Format("2006-01-02") }
+func Today() string { return time.Now().Format(time.DateOnly) }
 
 // NonEmpty is Python's nullif(v, ”).
 func NonEmpty(v string) *string {
