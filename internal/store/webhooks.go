@@ -95,3 +95,19 @@ func KnownEventType(name string) bool {
 	}
 	return false
 }
+
+// EndpointKey is one secret an endpoint's deliveries are signed with. Like the keys
+// the server seals with, each has its own id and several can sign at once: a new one is
+// added and the one it replaces signs beside it until ExpiresAt.
+type EndpointKey struct {
+	ID         int64     `gorm:"primaryKey"`
+	OrgID      int64     `gorm:"index;not null"`
+	EndpointID int64     `gorm:"index;not null"`
+	Kid        string    `gorm:"not null"`
+	Secret     string    `gorm:"not null"`
+	CreatedAt  time.Time `gorm:"not null"`
+	ExpiresAt  *time.Time
+}
+
+// Live is whether the key still signs at now.
+func (k EndpointKey) Live(now time.Time) bool { return k.ExpiresAt == nil || now.Before(*k.ExpiresAt) }

@@ -82,6 +82,7 @@ var sealedColumns = []sealedColumn{
 	{"org_mails", "password", "mail password", "org_id"},
 	{"agents", "api_key", "agent endpoint key", "id"},
 	{"seal_keys", "key", "agreement sealing key", "org_id"},
+	{"endpoint_keys", "secret", "webhook signing key", "id"},
 	{"webhook_endpoints", "secret", "webhook signing secret", "id"},
 	{"webhook_endpoints", "previous_secret", "webhook's previous signing secret", "id"},
 }

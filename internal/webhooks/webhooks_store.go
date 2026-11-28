@@ -129,6 +129,9 @@ func (s *WebhookStore) AddWebhook(org, key int64, rawURL string, events []string
 		if err := tx.Create(&e).Error; err != nil {
 			return err
 		}
+		if err := tx.Create(&store.EndpointKey{OrgID: org, EndpointID: e.ID, Kid: store.RandomToken(8), Secret: sealed, CreatedAt: e.CreatedAt}).Error; err != nil {
+			return err
+		}
 		return s.Log(tx, org, 0, nil, actor, store.ActEndpointNew, &u)
 	})
 	if err != nil {
@@ -198,6 +201,9 @@ func (s *WebhookStore) DeleteWebhook(org, id int64, actor string) error {
 		if err := tx.Delete(&e).Error; err != nil {
 			return err
 		}
+		if err := tx.Where("org_id = ? and endpoint_id = ?", org, id).Delete(&store.EndpointKey{}).Error; err != nil {
+			return err
+		}
 		return s.Log(tx, org, 0, nil, actor, store.ActEndpointDrop, &e.URL)
 	})
 }
@@ -218,7 +224,18 @@ func (s *WebhookStore) RotateWebhookSecret(org, id int64, actor string) (string,
 		if err := tx.Where("org_id = ? and id = ?", org, id).First(&e).Error; err != nil {
 			return store.Missing(err, "no webhook %d in this organisation", id)
 		}
-		until := time.Now().Add(Overlap)
+		now := time.Now()
+		until := now.Add(Overlap)
+		if err := tx.Where("org_id = ? and endpoint_id = ? and expires_at <= ?", org, id, now).Delete(&store.EndpointKey{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&store.EndpointKey{}).Where("org_id = ? and endpoint_id = ? and expires_at is null", org, id).Update("expires_at", until).Error; err != nil {
+			return err
+		}
+		if err := tx.Create(&store.EndpointKey{OrgID: org, EndpointID: id, Kid: store.RandomToken(8), Secret: sealed, CreatedAt: now}).Error; err != nil {
+			return err
+		}
+		// The release before the key set signs with these columns, kept in step for a rollback.
 		if err := tx.Model(&e).Updates(map[string]any{"secret": sealed, "previous_secret": e.Secret, "previous_until": until}).Error; err != nil {
 			return err
 		}

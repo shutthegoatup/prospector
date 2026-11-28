@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/shutthegoatup/prospector/internal/store"
 )
@@ -157,5 +158,33 @@ func TestGoingBackAReleaseStillStarts(t *testing.T) {
 	}
 	if !slices.Contains(versions, 99999) {
 		t.Fatalf("versions recorded: %v", versions)
+	}
+}
+
+// TestAnEndpointsSecretsAreCarriedIntoItsKeySet: its secret, and the one it replaced
+// while that still signs, become its keys; one that has stopped signing doesn't.
+func TestAnEndpointsSecretsAreCarriedIntoItsKeySet(t *testing.T) {
+	t.Parallel()
+	s := emptyStore(t)
+	if err := s.DB.AutoMigrate(models...); err != nil {
+		t.Fatal(err)
+	}
+	o := mustOrg(t, s, "alpha")
+	soon, gone := time.Now().Add(time.Hour), time.Now().Add(-time.Hour)
+	for _, e := range []store.WebhookEndpoint{
+		{OrgID: o.ID, KeyID: 1, URL: "https://a.example/", Secret: "sealed-a", PreviousSecret: "sealed-was-a", PreviousUntil: &soon, CreatedAt: time.Now()},
+		{OrgID: o.ID, KeyID: 1, URL: "https://b.example/", Secret: "sealed-b", PreviousSecret: "sealed-was-b", PreviousUntil: &gone, CreatedAt: time.Now()},
+	} {
+		if err := s.DB.Create(&e).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := s.migrate(); err != nil {
+		t.Fatal(err)
+	}
+	var secrets []string
+	s.DB.Model(&store.EndpointKey{}).Where("org_id = ?", o.ID).Order("secret").Pluck("secret", &secrets)
+	if strings.Join(secrets, " ") != "sealed-a sealed-b sealed-was-a" {
+		t.Fatalf("carried: %v", secrets)
 	}
 }
