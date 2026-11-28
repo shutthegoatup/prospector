@@ -383,7 +383,7 @@ func KeptValue(e store.Event) *string {
 	case e.Action == store.SetField.Of("stage").String() && store.ValidStage(v):
 		return &v
 	case store.Marked.Has(e.Action) && len(v) >= 10:
-		if _, err := time.Parse("2006-01-02", v[:10]); err == nil {
+		if _, err := time.Parse(time.DateOnly, v[:10]); err == nil {
 			return new(v[:10])
 		}
 	}

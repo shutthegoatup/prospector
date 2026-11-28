@@ -22,7 +22,7 @@ func TestASearchLeavesOutWhatWasAlreadyHere(t *testing.T) {
 	t.Parallel()
 	s, o, srv, ada := signedIn(t)
 	scout := store.Actor{Name: "agent:scout", KeyID: 1}
-	today := time.Now().Format(store.DayLayout)
+	today := time.Now().Format(time.DateOnly)
 
 	rejected := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Corvane Marine", Domain: "corvane.example"}))
 	if err := s.SetCompanyStage(o.ID, rejected.ID, prospecting.CompanyRejected, "", "Ada Lovelace"); err != nil {
@@ -115,7 +115,7 @@ func TestACompanyReachedThroughAPersonIsHeldToo(t *testing.T) {
 	if err := s.SetCompanyStage(o.ID, belair.ID, prospecting.CompanyQualified, "", "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	must(s.AddSubscription(o.ID, sales.SubscriptionIn{Company: belair.ID, Name: "Support", Amount: "1200", Per: store.PerYear, Start: time.Now().Format(store.DayLayout), TermMonths: 12, Then: sales.ThenRenews}, "Ada Lovelace"))
+	must(s.AddSubscription(o.ID, sales.SubscriptionIn{Company: belair.ID, Name: "Support", Amount: "1200", Per: store.PerYear, Start: time.Now().Format(time.DateOnly), TermMonths: 12, Then: sales.ThenRenews}, "Ada Lovelace"))
 	quiet := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Fennholt Campers", Domain: "fennholt.example"}))
 	if err := s.SetCompanyStage(o.ID, quiet.ID, prospecting.CompanyQualified, "", "Ada Lovelace"); err != nil {
 		t.Fatal(err)

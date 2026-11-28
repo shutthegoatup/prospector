@@ -35,10 +35,10 @@ func (s *CRMStore) Due(org int64, step string, now time.Time, set store.OrgSetti
 		q = q.Where(openContacts + " and phone is not null and phone != '' and called is null").
 			Order("linkedin_added is null, linkedin_added nulls first, fit nulls first")
 	case "email":
-		cutoff := now.AddDate(0, 0, -set.EmailAfterDays).Format("2006-01-02")
+		cutoff := now.AddDate(0, 0, -set.EmailAfterDays).Format(time.DateOnly)
 		q = q.Where(openContacts+" and email_sent is null and accepted is null and linkedin_added <= ?", cutoff).Order("linkedin_added")
 	case "followup":
-		cutoff := now.AddDate(0, 0, -set.FollowupAfterDays).Format("2006-01-02")
+		cutoff := now.AddDate(0, 0, -set.FollowupAfterDays).Format(time.DateOnly)
 		q = q.Where(openContacts+" and followup_sent is null and email_sent <= ?", cutoff).Order("email_sent")
 	default:
 		return nil, say.Errorf("unknown step %q", step)
@@ -129,8 +129,8 @@ func (s *CRMStore) SetContactField(tx *gorm.DB, org, id int64, field, value, act
 		}
 	}
 	if field == "next_date" && value != "" {
-		if _, err := time.Parse(time.DateOnly, value); err != nil {
-			return say.Errorf("%q isn't a date", value)
+		if _, err := store.ParseDay(value); err != nil {
+			return err
 		}
 	}
 	if field == "email" || field == "linkedin" {

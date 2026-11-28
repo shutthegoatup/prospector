@@ -298,7 +298,7 @@ func (s *CRMStore) Segments(org int64) ([]string, error) {
 
 func (s *CRMStore) Week(org int64, now time.Time) Stats {
 	since := now.AddDate(0, 0, -7)
-	day := since.Format("2006-01-02")
+	day := since.Format(time.DateOnly)
 	var st Stats
 	// From the contacts' own dates, so history brought over from an import counts.
 	for _, col := range []string{"linkedin_added", "email_sent", "followup_sent", "called"} {

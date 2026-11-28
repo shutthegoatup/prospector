@@ -25,7 +25,7 @@ func TestMonthsAreAddedWithoutSpillingIntoTheNext(t *testing.T) {
 		{"2024-02-29", 12, "2025-02-28"}, {"2024-02-29", 48, "2028-02-29"}, {"2026-01-12", 12, "2027-01-12"},
 		{"2026-11-30", 3, "2027-02-28"}, {"2026-05-15", 0, "2026-05-15"},
 	} {
-		if got := store.AddMonths(store.MustDay(c.from), c.n).Format(store.DayLayout); got != c.want {
+		if got := store.AddMonths(store.MustDay(c.from), c.n).Format(time.DateOnly); got != c.want {
 			t.Errorf("%s plus %d months is %s, want %s", c.from, c.n, got, c.want)
 		}
 	}
@@ -267,7 +267,7 @@ func TestTodayPointsAtSubscriptionsComingDue(t *testing.T) {
 	s, o, srv, client := signedIn(t)
 	person := repliedPerson(t, s, o, "Hannah Pryce")
 	now := store.MustDay(store.Today())
-	on := func(days int) string { return now.AddDate(0, 0, days).Format(store.DayLayout) }
+	on := func(days int) string { return now.AddDate(0, 0, days).Format(time.DateOnly) }
 	// A year-long term that began 11 months ago ends in about a month; its day to cancel by is nearer still.
 	record := func(start string, notice int) *store.Subscription {
 		return must(s.AddSubscription(o.ID, sales.SubscriptionIn{Company: *person.CompanyID, Name: "Plan", Start: start, TermMonths: 12, NoticeDays: notice}, "Ada Lovelace"))
@@ -279,7 +279,7 @@ func TestTodayPointsAtSubscriptionsComingDue(t *testing.T) {
 	if dueSubs(t, client, srv.URL) != 0 {
 		t.Error("Today points at a subscription with eleven months to run")
 	}
-	near := record(now.AddDate(-1, 0, 20).Format(store.DayLayout), 0)
+	near := record(now.AddDate(-1, 0, 20).Format(time.DateOnly), 0)
 	if dueSubs(t, client, srv.URL) != 1 {
 		t.Error("Today says nothing of a subscription whose term ends in under three weeks")
 	}
@@ -322,7 +322,7 @@ func TestTodayPointsAtSubscriptionsComingDue(t *testing.T) {
 	// A plan that turns over every month always has a term ending within the month:
 	// that is routine, until it has a day it stops.
 	monthly := must(s.AddSubscription(o.ID, sales.SubscriptionIn{Company: *person.CompanyID, Name: "Monthly", Per: store.PerMonth, Start: on(-100)}, "Ada Lovelace"))
-	rolled := must(s.AddSubscription(o.ID, sales.SubscriptionIn{Company: *person.CompanyID, Name: "Rolled", Per: store.PerMonth, Start: now.AddDate(0, -8, 0).Format(store.DayLayout), TermMonths: 6, Then: store.ThenRolls}, "Ada Lovelace"))
+	rolled := must(s.AddSubscription(o.ID, sales.SubscriptionIn{Company: *person.CompanyID, Name: "Rolled", Per: store.PerMonth, Start: now.AddDate(0, -8, 0).Format(time.DateOnly), TermMonths: 6, Then: store.ThenRolls}, "Ada Lovelace"))
 	if dueSubs(t, client, srv.URL) != 0 {
 		t.Error("Today points at plans that only turn over monthly")
 	}
@@ -360,7 +360,7 @@ func TestARenewalDealIsStartedFromASubscription(t *testing.T) {
 	if err := s.Mark(o.ID, elsewhere.ID, "replied", store.Today(), "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	start := store.MustDay(store.Today()).AddDate(0, -11, 0).Format(store.DayLayout)
+	start := store.MustDay(store.Today()).AddDate(0, -11, 0).Format(time.DateOnly)
 	sub := must(s.AddSubscription(o.ID, sales.SubscriptionIn{Company: *hannah.CompanyID, Name: "Standard plan", Amount: "1,500", Per: store.PerMonth, Start: start, TermMonths: 12, NoticeDays: 30}, "Ada Lovelace"))
 	ended := must(s.AddSubscription(o.ID, sales.SubscriptionIn{Company: *hannah.CompanyID, Name: "Old plan", Start: "2020-01-01", TermMonths: 12, Then: store.ThenEnds}, "Ada Lovelace"))
 
@@ -524,7 +524,7 @@ func TestTheSubscriptionsListCarriesWhatThePageShows(t *testing.T) {
 	record := func(name, amount, per string, start time.Time) {
 		t.Helper()
 		if code, body := call(t, client, "POST", subs, "application/json", map[string]any{"company": *hannah.CompanyID, "name": name, "amount": amount,
-			"per": per, "start": start.Format(store.DayLayout), "term_months": 12, "then": "renews"}); code != http.StatusCreated {
+			"per": per, "start": start.Format(time.DateOnly), "term_months": 12, "then": "renews"}); code != http.StatusCreated {
 			t.Fatalf("recording %s: %d %s", name, code, body)
 		}
 	}

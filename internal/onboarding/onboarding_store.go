@@ -3,6 +3,7 @@ package onboarding
 import (
 	"sort"
 	"strings"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -44,7 +45,7 @@ func (s *OnboardingStore) StartOnboarding(org int64, in OnboardingIn, actor stri
 		for i, p := range plan {
 			steps[i] = store.OnboardingStep{OrgID: org, OnboardingID: ob.ID, Seq: i + 1, Name: p.Name, Who: p.Who}
 			if p.Days >= 0 {
-				steps[i].Due = new(start.AddDate(0, 0, p.Days).Format(store.DayLayout))
+				steps[i].Due = new(start.AddDate(0, 0, p.Days).Format(time.DateOnly))
 			}
 		}
 		if err := tx.Create(&steps).Error; err != nil {
