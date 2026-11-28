@@ -49,7 +49,7 @@ func post(t *testing.T, h http.Handler, provider string, signed bool, body []byt
 func TestEveryProviderIsAnsweredTheSameWay(t *testing.T) {
 	t.Parallel()
 	kept, unreadable, failing := &fake{}, &fake{handle: ErrMalformed}, &fake{handle: errors.New("the database is away")}
-	h := Handler(map[string]Provider{"kept": kept, "unreadable": unreadable, "failing": failing})
+	h := Handler(map[string]Provider{"kept": kept, "unreadable": unreadable, "failing": failing}, nil)
 	for _, c := range []struct {
 		name, provider string
 		signed         bool
@@ -75,7 +75,7 @@ func TestASignatureIsCheckedOverTheBytesAsTheyCame(t *testing.T) {
 	t.Parallel()
 	f := &fake{}
 	body := []byte(`{"Email":"ada\u0000@larkmoor.example"}`)
-	if code := post(t, Handler(map[string]Provider{"f": f}), "f", true, body); code != http.StatusNoContent {
+	if code := post(t, Handler(map[string]Provider{"f": f}, nil), "f", true, body); code != http.StatusNoContent {
 		t.Fatalf("%d", code)
 	}
 	if !bytes.Equal(f.verified, body) {

@@ -3,6 +3,7 @@ package marketing
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/shutthegoatup/prospector/internal/hooks"
@@ -19,6 +20,8 @@ type postmarkRecord struct {
 	RecordType string `json:"RecordType"`
 	Type       string `json:"Type"`
 	Email      string `json:"Email"`
+	ID         int64  `json:"ID"`
+	MessageID  string `json:"MessageID"`
 }
 
 // permanent is whether the bounce says the address won't take mail at all. A soft
@@ -38,6 +41,22 @@ func (h PostmarkHook) Verify(r *http.Request, _ []byte) (int64, error) {
 		return 0, hooks.ErrUnauthorized
 	}
 	return o.ID, nil
+}
+
+// EventID is a record's own id, by its kind: a bounce and a complaint are numbered apart.
+// One without falls back to the mail it is about.
+func (h PostmarkHook) EventID(body []byte) string {
+	var b postmarkRecord
+	if json.Unmarshal(body, &b) != nil || b.RecordType == "" {
+		return ""
+	}
+	if b.ID != 0 {
+		return fmt.Sprintf("%s:%d", b.RecordType, b.ID)
+	}
+	if b.MessageID != "" {
+		return b.RecordType + ":" + b.MessageID
+	}
+	return ""
 }
 
 func (h PostmarkHook) Handle(_ context.Context, org int64, _ *http.Request, body []byte) error {
