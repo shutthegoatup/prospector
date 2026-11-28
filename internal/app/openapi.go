@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/shutthegoatup/prospector/internal/slicesx"
+
 	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/shutthegoatup/prospector/api"
@@ -241,7 +243,7 @@ func agentOut(c store.Agent, all []store.Agent, lang string) api.Agent {
 		tools = append(tools, api.Tool{Name: t.Name, Description: t.Description})
 	}
 	return api.Agent{Id: c.ID, Name: c.Name, Kind: api.AgentKind(c.Kind), BaseUrl: c.BaseURL, Model: c.Model, ToolsUrl: c.ToolsURL, SearchUrl: c.SearchURL,
-		Models: nonNil(c.ModelList()), Tools: tools, AllowedTools: nonNil(c.AllowedTools()), Fallback: c.FallbackID, FallbackMinutes: c.FallbackMinutes,
+		Models: slicesx.NonNil(c.ModelList()), Tools: tools, AllowedTools: slicesx.NonNil(c.AllowedTools()), Fallback: c.FallbackID, FallbackMinutes: c.FallbackMinutes,
 		ThinkingOff: c.ThinkingOff, Problem: c.Problem, CheckedAt: c.CheckedAt, HasKey: c.APIKey != "", Ready: c.Ready(), UpdatedBy: c.UpdatedBy, UpdatedAt: c.UpdatedAt,
 		State: api.AgentState{Rail: api.AgentStateRail(st.Rail), Line: st.Line.In(lang), Todo: st.Todo.In(lang)}, Searches: c.Searches(), SearchText: v.SearchText().In(lang),
 		ToolsText: v.ToolsText().In(lang), FallbackText: v.FallbackText().In(lang)}
@@ -253,19 +255,12 @@ func (s apiServer) oneAgentOut(ctx context.Context, org int64, c store.Agent) (a
 	return agentOut(c, all, request.LanguageFrom(ctx)), err
 }
 
-func nonNil(s []string) []string {
-	if s == nil {
-		return []string{}
-	}
-	return s
-}
-
 func settingsIn(id int64, b *api.AgentSettings) (AgentSettingsIn, error) {
 	if b == nil {
 		return AgentSettingsIn{}, say.New("send the agent's settings")
 	}
 	return AgentSettingsIn{ID: id, Name: b.Name, Kind: b.Kind, BaseURL: b.BaseUrl, APIKey: b.ApiKey, Model: b.Model, ToolsURL: b.ToolsUrl, SearchURL: b.SearchUrl,
-		Tools: nonNil(b.Tools), Fallback: b.Fallback, FallbackMinutes: b.FallbackMinutes, ThinkingOff: b.ThinkingOff}, nil
+		Tools: slicesx.NonNil(b.Tools), Fallback: b.Fallback, FallbackMinutes: b.FallbackMinutes, ThinkingOff: b.ThinkingOff}, nil
 }
 
 // savedMessage says how a save went, for a person.
@@ -356,10 +351,7 @@ func (s apiServer) ListRuns(ctx context.Context, in api.ListRunsRequestObject) (
 		return nil, err
 	}
 	out := api.ListRuns200JSONResponse{Headers: api.ListRuns200ResponseHeaders{Link: request.NextLink(ctx, next)}}
-	out.Body.Items, out.Body.NextCursor = []api.Run{}, next
-	for _, r := range runs {
-		out.Body.Items = append(out.Body.Items, research.RunOut(r))
-	}
+	out.Body.Items, out.Body.NextCursor = slicesx.Map(runs, research.RunOut), next
 	return out, nil
 }
 

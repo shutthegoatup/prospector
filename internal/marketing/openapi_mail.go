@@ -3,6 +3,8 @@ package marketing
 import (
 	"context"
 
+	"github.com/shutthegoatup/prospector/internal/slicesx"
+
 	"github.com/shutthegoatup/prospector/api"
 
 	"github.com/shutthegoatup/prospector/internal/paging"
@@ -24,10 +26,7 @@ func (s MarketingAPI) ListSuppressions(ctx context.Context, in api.ListSuppressi
 		return nil, err
 	}
 	out := api.ListSuppressions200JSONResponse{Headers: api.ListSuppressions200ResponseHeaders{Link: request.NextLink(ctx, next)}}
-	out.Body.Items, out.Body.NextCursor = []api.Suppression{}, next
-	for _, r := range rows {
-		out.Body.Items = append(out.Body.Items, suppressionOut(r))
-	}
+	out.Body.Items, out.Body.NextCursor = slicesx.Map(rows, suppressionOut), next
 	return out, nil
 }
 

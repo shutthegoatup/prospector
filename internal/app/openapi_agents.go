@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/shutthegoatup/prospector/internal/slicesx"
+
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/identity"
@@ -42,7 +44,7 @@ func (s apiServer) GetConnect(ctx context.Context, _ api.GetConnectRequestObject
 }
 
 func keyOut(k store.APIKey) api.APIKey {
-	return api.APIKey{Id: k.ID, Name: k.Name, Prefix: k.Prefix, Scopes: nonNil(strings.Fields(k.Scopes)), CreatedBy: k.CreatedBy,
+	return api.APIKey{Id: k.ID, Name: k.Name, Prefix: k.Prefix, Scopes: strings.Fields(k.Scopes), CreatedBy: k.CreatedBy,
 		CreatedAt: k.CreatedAt, LastUsedAt: k.LastUsedAt, Builtin: k.Prefix == store.BuiltinPrefix}
 }
 
@@ -56,10 +58,7 @@ func (s apiServer) ListKeys(ctx context.Context, in api.ListKeysRequestObject) (
 		return nil, err
 	}
 	out := api.ListKeys200JSONResponse{Headers: api.ListKeys200ResponseHeaders{Link: request.NextLink(ctx, next)}}
-	out.Body.Items, out.Body.NextCursor = []api.APIKey{}, next
-	for _, k := range keys {
-		out.Body.Items = append(out.Body.Items, keyOut(k))
-	}
+	out.Body.Items, out.Body.NextCursor = slicesx.Map(keys, keyOut), next
 	return out, nil
 }
 

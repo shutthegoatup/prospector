@@ -3,6 +3,8 @@ package research
 import (
 	"context"
 
+	"github.com/shutthegoatup/prospector/internal/slicesx"
+
 	"github.com/shutthegoatup/prospector/api"
 
 	"github.com/shutthegoatup/prospector/internal/paging"
@@ -32,10 +34,7 @@ func (s ResearchAPI) ListOfferings(ctx context.Context, in api.ListOfferingsRequ
 		return nil, err
 	}
 	out := api.ListOfferings200JSONResponse{Headers: api.ListOfferings200ResponseHeaders{Link: request.NextLink(ctx, next)}}
-	out.Body.Items, out.Body.NextCursor = []api.Offering{}, next
-	for _, o := range rows {
-		out.Body.Items = append(out.Body.Items, offeringOut(o))
-	}
+	out.Body.Items, out.Body.NextCursor = slicesx.Map(rows, offeringOut), next
 	return out, nil
 }
 
@@ -94,10 +93,7 @@ func (s ResearchAPI) ListVerdicts(ctx context.Context, in api.ListVerdictsReques
 		return nil, err
 	}
 	out := api.ListVerdicts200JSONResponse{Headers: api.ListVerdicts200ResponseHeaders{Link: request.NextLink(ctx, next)}}
-	out.Body.Items, out.Body.NextCursor = []api.Verdict{}, next
-	for _, v := range rows {
-		out.Body.Items = append(out.Body.Items, verdictOut(v))
-	}
+	out.Body.Items, out.Body.NextCursor = slicesx.Map(rows, verdictOut), next
 	return out, nil
 }
 
@@ -111,10 +107,7 @@ func (s ResearchAPI) ListCompanyVerdicts(ctx context.Context, in api.ListCompany
 		return nil, err
 	}
 	out := api.ListCompanyVerdicts200JSONResponse{Headers: api.ListCompanyVerdicts200ResponseHeaders{Link: request.NextLink(ctx, next)}}
-	out.Body.Items, out.Body.NextCursor = []api.Verdict{}, next
-	for _, v := range rows {
-		out.Body.Items = append(out.Body.Items, verdictOut(v))
-	}
+	out.Body.Items, out.Body.NextCursor = slicesx.Map(rows, verdictOut), next
 	return out, nil
 }
 
@@ -133,10 +126,7 @@ func (s ResearchAPI) ListCompanyRoles(ctx context.Context, in api.ListCompanyRol
 		return nil, err
 	}
 	out := api.ListCompanyRoles200JSONResponse{Headers: api.ListCompanyRoles200ResponseHeaders{Link: request.NextLink(ctx, next)}}
-	out.Body.Items, out.Body.NextCursor = []api.Role{}, next
-	for _, r := range rows {
-		out.Body.Items = append(out.Body.Items, roleOut(r))
-	}
+	out.Body.Items, out.Body.NextCursor = slicesx.Map(rows, roleOut), next
 	return out, nil
 }
 
