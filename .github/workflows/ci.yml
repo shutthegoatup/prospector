@@ -74,7 +74,9 @@ jobs:
       # A function nothing reaches, not even a test, is one to delete.
       - name: Dead code
         run: |
-          dead=$(go run golang.org/x/tools/cmd/deadcode@v0.53.0 -test ./... | grep -v '^web/node_modules/' || true)
+          # Its own exit status first: a deadcode that failed to load prints nothing either.
+          out=$(go run golang.org/x/tools/cmd/deadcode@v0.53.0 -test ./...)
+          dead=$(printf '%s\n' "$out" | grep -v -e '^web/node_modules/' -e '^$' || true)
           if [ -n "$dead" ]; then echo "$dead"; exit 1; fi
 
   # The tests, split across runners by name: each runs every third.
