@@ -438,3 +438,8 @@ func standIn(kind, name string) string {
 // SigningConsent is what a signer agrees to by signing, shown on the page and kept on
 // the certificate word for word. The certificate names its version.
 const SigningConsent = "I've read the document. I agree to sign it electronically, and that typing my name here is my signature."
+
+func init() {
+	// pdfcpu otherwise writes a configuration directory under the user's home.
+	model.ConfigPath = "disable"
+}

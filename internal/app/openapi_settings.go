@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"reflect"
+	"regexp"
 	"slices"
 	"strings"
 	"unicode/utf8"
@@ -14,6 +15,8 @@ import (
 	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
+
+var currencyRe = regexp.MustCompile(`^[A-Z]{3}$`)
 
 func settingsOut(o *store.Org) api.Settings {
 	set := o.Settings.WithDefaults()
