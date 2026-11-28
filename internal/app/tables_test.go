@@ -52,6 +52,7 @@ var orgExportHolds = map[string]string{
 	"enquiries":            "enquiries",
 	"enquiry_messages":     "enquiry_messages",
 	"suppressions":         "not_to_be_mailed",
+	"webhook_deliveries":   "not exported: what was sent to an endpoint and how it went, by event id; it says nothing an event doesn't",
 	"webhook_endpoints":    "not exported: where an owner sends the organisation's events, and the sealed secret that signs them, which no other server could open; an owner sets them up again",
 	"bounce_hooks":         "not exported: the hash of the secret Postmark's webhook signs in with, which can only add bounces and complaints to the list",
 	"unsubscribe_links":    "not exported: the hash of the secret in one mail's unsubscribe link, which can only unsubscribe that address",

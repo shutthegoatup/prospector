@@ -121,3 +121,21 @@ func (s WebhooksAPI) RotateWebhookSecret(ctx context.Context, in api.RotateWebho
 	}
 	return api.RotateWebhookSecret200JSONResponse{Secret: secret}, nil
 }
+
+func (s WebhooksAPI) ListWebhookDeliveries(ctx context.Context, in api.ListWebhookDeliveriesRequestObject) (api.ListWebhookDeliveriesResponseObject, error) {
+	all, err := s.Endpoints.Deliveries(request.ReqFrom(ctx).Org.ID, in.Id)
+	if err != nil {
+		return nil, err
+	}
+	page, next, err := paging.ListPage(all, in.Params.Limit, in.Params.Cursor)
+	if err != nil {
+		return nil, err
+	}
+	out := api.ListWebhookDeliveries200JSONResponse{Headers: api.ListWebhookDeliveries200ResponseHeaders{Link: request.NextLink(ctx, next)}}
+	out.Body.Items = slicesx.Map(page, func(d store.WebhookDelivery) api.WebhookDelivery {
+		return api.WebhookDelivery{Id: d.ID, Type: d.Type, MessageId: d.MessageID, Status: api.WebhookDeliveryStatus(d.Status), Attempts: d.Attempts,
+			LastCode: d.LastCode, LastError: d.LastError, NextAt: d.NextAt, CreatedAt: d.CreatedAt, DeliveredAt: d.DeliveredAt}
+	})
+	out.Body.NextCursor = next
+	return out, nil
+}

@@ -25,6 +25,7 @@ const (
 
 // leavesNoHistory are the methods that change an organisation's rows without an event.
 var leavesNoHistory = map[string]string{
+	"Delivered": deliveries, "Retry": deliveries, "Cancel": deliveries,
 	"SaveVoice": "a member's own preferences", "SetAreas": "a member's own preferences",
 	"ChangeAgreement": drafting, "PutAgreementFields": drafting, "PutAgreementFile": drafting, "AddRecipient": drafting, "ChangeRecipient": drafting,
 	"RemoveRecipient": drafting, "ChangeCampaign": drafting,
@@ -45,6 +46,7 @@ var leavesNoHistory = map[string]string{
 
 const (
 	notInState = "needs a run or a claim in a state the seeded rows aren't in; their own tests show what happens"
+	deliveries = "a webhook delivery's own bookkeeping, listed by GET /webhooks/{id}/deliveries; GiveUp logs when it stops the endpoint"
 	logsByHand = "logs, as read by hand; the fuzzing's words don't make a call it accepts"
 )
 

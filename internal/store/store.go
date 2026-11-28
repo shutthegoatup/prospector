@@ -258,7 +258,11 @@ func (s *Core) Log(tx *gorm.DB, org, contact int64, company *int64, actor string
 }
 
 func (s *Core) LogAs(tx *gorm.DB, org, contact int64, company *int64, who Actor, action Action, value *string) error {
-	return tx.Create(&Event{OrgID: org, ContactID: contact, CompanyID: company, User: who.Name, KeyID: who.KeyID, TaskID: who.Task, Action: action.String(), Value: value, At: time.Now()}).Error
+	e := Event{OrgID: org, ContactID: contact, CompanyID: company, User: who.Name, KeyID: who.KeyID, TaskID: who.Task, Action: action.String(), Value: value, At: time.Now()}
+	if err := tx.Create(&e).Error; err != nil {
+		return err
+	}
+	return queueWebhooks(tx, &e)
 }
 
 // HoldOrg and hold make a transaction wait its turn on one row, so a rule that is

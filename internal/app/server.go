@@ -19,6 +19,7 @@ import (
 
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/cleantext"
+	"github.com/shutthegoatup/prospector/internal/egress"
 	"github.com/shutthegoatup/prospector/internal/hooks"
 	"github.com/shutthegoatup/prospector/internal/identity"
 	"github.com/shutthegoatup/prospector/internal/mailer"
@@ -26,6 +27,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
+	"github.com/shutthegoatup/prospector/internal/webhooks"
 )
 
 const sessionCookie = "session"
@@ -51,6 +53,8 @@ type App struct {
 	later func(func())
 	// sending counts the mail still on its way out, which stopping waits for.
 	sending sync.WaitGroup
+	// deliverer sends the webhooks due; serve starts it, so test Apps send none.
+	deliverer *webhooks.Deliverer
 	// How long a request's body may take to arrive, and its answer to be written;
 	// zero means bodyLimit and answerLimit.
 	readLimit, writeLimit time.Duration
@@ -592,6 +596,9 @@ func serve(a *App, addr string) error {
 	asked, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	// Asked once, it stops listening for signals, so asking again stops it at once.
 	context.AfterFunc(asked, stop)
+	// Webhooks due go out, here or from another server; one cut short goes again later.
+	a.deliverer = &webhooks.Deliverer{Store: &a.s.WebhookStore, Client: egress.Client(egress.Options{Timeout: 20 * time.Second}), Base: a.base}
+	a.deliverer.Run(asked, 5*time.Second)
 	return a.serveUntil(asked, ln, stopWithin)
 }
 
@@ -617,7 +624,13 @@ func (a *App) serveUntil(asked context.Context, ln net.Listener, within time.Dur
 		_ = srv.Close()
 	}
 	sent := make(chan struct{})
-	go func() { a.sending.Wait(); close(sent) }()
+	go func() {
+		a.sending.Wait()
+		if a.deliverer != nil {
+			a.deliverer.Wait()
+		}
+		close(sent)
+	}()
 	select {
 	case <-sent:
 	case <-grace.Done():

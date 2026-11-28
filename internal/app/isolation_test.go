@@ -26,6 +26,8 @@ import (
 // organisations, and looking one up to begin with. Every other exported method of
 // the store has to take its organisation first, and is tried below as another one.
 var acrossOrganisations = map[string]bool{
+	// The deliverer's sweep for what is due, in every organisation.
+	"ClaimDue":   true,
 	"CreateUser": true, "InviteUser": true, "SetPassword": true, "ChangePassword": true, "UserByEmail": true,
 	"Login": true, "NewSession": true, "AddProof": true, "SessionFor": true, "SessionUser": true, "Logout": true,
 	"ResetToken": true, "InviteToken": true, "PasswordTokenUser": true, "RedeemPasswordToken": true,
@@ -391,6 +393,8 @@ var saysNothingBack = map[string]bool{
 	"NewBounceHook": true, "DropBounceHook": true, "HasBounceHook": true,
 	// Need a key and an https address the fuzzing's words aren't; TestAWebhookStaysInItsOrganisation tries them.
 	"AddWebhook": true, "ChangeWebhook": true, "RotateWebhookSecret": true, "DeleteWebhook": true,
+	// Settle a delivery ClaimDue handed out; webhook_delivery_test.go sends and settles them.
+	"Delivered": true, "Retry": true, "Cancel": true, "GiveUp": true,
 	"Mark": true, "MarkAs": true, "Claim": true, "Withheld": true, "Update": true,
 	// Needs a task read for it; TestAnotherOrganisationCantClaimThroughATaskItWasHanded tries it.
 	"ClaimNext": true,

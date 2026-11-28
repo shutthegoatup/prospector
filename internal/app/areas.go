@@ -30,7 +30,7 @@ var opArea = map[string]string{
 	"AddAgreementRecipient": identity.AreaSales, "ChangeAgreementRecipient": identity.AreaSales, "RemoveAgreementRecipient": identity.AreaSales, "PutAgreementFields": identity.AreaSales,
 	"EnrichContact": identity.AreaSales,
 	"CreateAgent":   "", "UpdateAgent": "", "DeleteAgent": "", "CreateKey": "", "ChangeKey": "", "RevokeKey": "",
-	"ListWebhooks": "", "GetWebhook": "", "CreateWebhook": "", "ChangeWebhook": "", "DeleteWebhook": "", "RotateWebhookSecret": "", "DeleteEnquiry": "", "ChangeSettings": "", "SaveEnricher": "", "DeleteEnricher": "",
+	"ListWebhooks": "", "GetWebhook": "", "CreateWebhook": "", "ChangeWebhook": "", "DeleteWebhook": "", "RotateWebhookSecret": "", "ListWebhookDeliveries": "", "DeleteEnquiry": "", "ChangeSettings": "", "SaveEnricher": "", "DeleteEnricher": "",
 	"ExportPerson": "", "ErasePerson": "",
 	"AddOffering": "", "ChangeOffering": "", "RemoveOffering": "",
 	"AddMember": "", "ChangeMember": "", "RemoveMember": "", "GetMailServer": "", "SaveMailServer": "", "TestMailServer": "", "MakeBounceHook": "", "DropBounceHook": "",
