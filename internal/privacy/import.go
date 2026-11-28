@@ -1,4 +1,4 @@
-package app
+package privacy
 
 import (
 	"errors"
@@ -9,7 +9,6 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/shutthegoatup/prospector/internal/crm"
-	"github.com/shutthegoatup/prospector/internal/privacy"
 	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
 	"github.com/shutthegoatup/prospector/internal/tz"
@@ -19,8 +18,8 @@ import (
 // but a date or edit recorded in the tracker is never cleared. It is refused whole if it
 // would bring in an address on the never-contact list; one already stored may stay, so
 // listing someone who opted out doesn't break every later import.
-func (s *Store) Import(org int64, p *ImportPayload, actor string) (int64, error) {
-	o, err := s.OrgByID(org)
+func (s *PrivacyStore) Import(org int64, p *ImportPayload, actor string) (int64, error) {
+	o, err := s.Identity.OrgByID(org)
 	if err != nil {
 		return 0, err
 	}
@@ -35,7 +34,7 @@ func (s *Store) Import(org int64, p *ImportPayload, actor string) (int64, error)
 			}
 			blocked = append(blocked, fmt.Sprintf("%s in %s was erased on request; take them out of the file", d.Key, d.File))
 		}
-		email, link := s.Allowed(o, d.Email, ""), s.Allowed(o, "", d.Linkedin)
+		email, link := s.CRM.Allowed(o, d.Email, ""), s.CRM.Allowed(o, "", d.Linkedin)
 		if email == nil && link == nil {
 			continue
 		}
@@ -64,7 +63,7 @@ func (s *Store) Import(org int64, p *ImportPayload, actor string) (int64, error)
 		if err := importCompanies(tx, org, p.Companies); err != nil {
 			return err
 		}
-		if err := privacy.LinkCompanies(tx, org, p.Companies); err != nil {
+		if err := LinkCompanies(tx, org, p.Companies); err != nil {
 			return err
 		}
 		var missing []store.Contact
@@ -154,17 +153,17 @@ func knownMakers(tx *gorm.DB, org int64) (string, error) {
 
 // importCompanies keeps the Python tracker's "org:" placeholder contacts so the
 // snapshot stays the same file; the companies table is filled by linkCompanies.
-func importCompanies(tx *gorm.DB, org int64, companies []privacy.CompanyRow) error {
+func importCompanies(tx *gorm.DB, org int64, companies []CompanyRow) error {
 	known, err := knownMakers(tx, org)
 	if err != nil {
 		return err
 	}
 	for _, r := range companies {
 		name := r["name"]
-		if strings.Contains(known, privacy.CompanyStem(name)) {
+		if strings.Contains(known, CompanyStem(name)) {
 			continue
 		}
-		hold := privacy.CompetitorHold(r)
+		hold := CompetitorHold(r)
 		var flags []string
 		for _, x := range []string{r["segment"], r["fit_reason"], labelled("Buyer: ", r["buyer_role"]),
 			labelled("Configurator built by: ", r["configurator_built_by"])} {
@@ -206,7 +205,7 @@ func importCompanies(tx *gorm.DB, org int64, companies []privacy.CompanyRow) err
 		return err
 	}
 	for _, o := range orgs {
-		if strings.Contains(known, privacy.CompanyStem(store.Deref(o.Maker))) {
+		if strings.Contains(known, CompanyStem(store.Deref(o.Maker))) {
 			if err := tx.Delete(&o).Error; err != nil {
 				return err
 			}

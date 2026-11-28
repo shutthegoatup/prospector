@@ -49,13 +49,14 @@ type Store struct {
 func newStore(c *store.Core) *Store {
 	s := &Store{Core: c, IdentityStore: identity.IdentityStore{Core: c}, AgentStore: agents.AgentStore{Core: c}, SSOStore: identity.SSOStore{Core: c},
 		SuppressionStore: marketing.SuppressionStore{Core: c}, CustomerStore: onboarding.CustomerStore{Core: c}, DealStore: sales.DealStore{Core: c},
-		SubscriptionStore: sales.SubscriptionStore{Core: c}, OnboardingStore: onboarding.OnboardingStore{Core: c}, PrivacyStore: privacy.PrivacyStore{Core: c}}
+		SubscriptionStore: sales.SubscriptionStore{Core: c}, OnboardingStore: onboarding.OnboardingStore{Core: c}}
 	// An area that needs another's queries holds that area, not the whole store.
 	s.CRMStore = crm.CRMStore{Core: c, Sales: &s.DealStore}
 	s.ProspectingStore = prospecting.ProspectingStore{Core: c, Identity: &s.IdentityStore, CRM: &s.CRMStore}
 	s.EnquiryStore = tickets.EnquiryStore{Core: c, CRM: &s.CRMStore}
 	s.AgreementStore = signing.AgreementStore{Core: c, CRM: &s.CRMStore, Identity: &s.IdentityStore}
 	s.OutreachStore = marketing.OutreachStore{Core: c, Identity: &s.IdentityStore, Suppression: &s.SuppressionStore, Billing: &s.SubscriptionStore}
+	s.PrivacyStore = privacy.PrivacyStore{Core: c, Identity: &s.IdentityStore, CRM: &s.CRMStore}
 	s.ResearchStore = research.ResearchStore{Core: c, Prospecting: &s.ProspectingStore, CRM: &s.CRMStore, Identity: &s.IdentityStore, Outreach: &s.OutreachStore}
 	return s
 }
