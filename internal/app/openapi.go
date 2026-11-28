@@ -8,6 +8,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/shutthegoatup/prospector/internal/apidoc"
+	"github.com/shutthegoatup/prospector/internal/identity"
+
 	"github.com/shutthegoatup/prospector/internal/slicesx"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -70,7 +73,7 @@ func (a *App) routeAPI(mux *http.ServeMux) {
 	scopes, account, keysOnly, agentOps := map[string][]string{}, map[string]bool{}, map[string]bool{}, map[string]bool{}
 	for path, item := range spec.Paths.Map() {
 		for method, op := range item.Operations() {
-			if s := opScopes(op); len(s) > 0 {
+			if s := apidoc.OpScopes(op); len(s) > 0 {
 				scopes[op.OperationID] = s
 				if !sessionAllowed(op) {
 					keysOnly[method+" "+path], agentOps[op.OperationID] = true, true
@@ -187,7 +190,7 @@ func (a *App) apiScope(scopes map[string][]string) api.StrictMiddlewareFunc {
 			case q.Key != nil && !slices.ContainsFunc(need, q.Key.Has):
 				challenge(w, r, http.StatusForbidden, "insufficient_scope", need[0], say.Errorf("this key lacks the %s scope", strings.Join(need, " or ")))
 				return nil, nil
-			case q.Key == nil && slices.ContainsFunc(need, ownersOnly) && !q.Owner():
+			case q.Key == nil && slices.ContainsFunc(need, identity.OwnersOnly) && !q.Owner():
 				request.WriteProblem(w, r, http.StatusForbidden, say.New("only an owner of this organisation can change that"))
 				return nil, nil
 			case q.Key == nil && q.Org != nil && !q.Member.Works(opArea[op]):
@@ -199,19 +202,6 @@ func (a *App) apiScope(scopes map[string][]string) api.StrictMiddlewareFunc {
 	}
 }
 
-// opScopes are the scopes a key may make an operation with, any one of them.
-func opScopes(op *openapi3.Operation) []string {
-	var out []string
-	if op.Security != nil {
-		for _, req := range *op.Security {
-			if s := req["bearer"]; len(s) > 0 {
-				out = append(out, s[0])
-			}
-		}
-	}
-	return out
-}
-
 // sessionAllowed is whether a person signed in may make op, besides a key.
 func sessionAllowed(op *openapi3.Operation) bool {
 	if op.Security == nil {
@@ -221,14 +211,6 @@ func sessionAllowed(op *openapi3.Operation) bool {
 		if _, ok := req["session"]; ok {
 			return true
 		}
-	}
-	return false
-}
-
-func ownersOnly(scope string) bool {
-	switch scope {
-	case "agents:configure", "enquiries:delete", "settings:write", "people:privacy", "team:write", "mail:configure", "sso:configure", "org:export":
-		return true
 	}
 	return false
 }

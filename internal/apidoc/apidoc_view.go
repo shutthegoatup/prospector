@@ -1,4 +1,4 @@
-package app
+package apidoc
 
 import "strings"
 
@@ -6,9 +6,9 @@ import "strings"
 // from this view of the spec: web/src/site/apidoc.json, which a test keeps in step with
 // api/openapi.yaml. Everything derived is worked out here, so the page only lays it out.
 
-// docBase stands in for the server's own address in the built page; the server puts
+// Base stands in for the server's own address in the built page; the server puts
 // its address in its place as it answers.
-const docBase = "https://prospector.invalid"
+const Base = "https://prospector.invalid"
 
 type docView struct {
 	Title   string      `json:"title"`
@@ -93,7 +93,7 @@ type docSchema struct {
 	Fields []docField `json:"fields"`
 }
 
-func docViewOf(doc APIDoc) docView {
+func View(doc Doc) docView {
 	spans := func(s string) []docSpan {
 		out := []docSpan{}
 		for _, sp := range codeSpans(s) {
@@ -102,7 +102,7 @@ func docViewOf(doc APIDoc) docView {
 		return out
 	}
 	typ := func(t string) docType { return docType{t, schemaLink(doc, t)} }
-	fields := func(in []APIField) []docField {
+	fields := func(in []Field) []docField {
 		out := []docField{}
 		for _, f := range in {
 			out = append(out, docField{f.Name, typ(f.Type), spans(f.About), f.Required, f.Write})
@@ -116,8 +116,8 @@ func docViewOf(doc APIDoc) docView {
 	for _, g := range doc.Groups {
 		dg := docGroup{Name: g.Name, About: spans(g.About), Ops: []docOp{}}
 		for _, o := range g.Ops {
-			op := docOp{Anchor: opAnchor(o), Method: o.Method, Tone: methodTone(o.Method), Path: o.Path, Summary: o.Summary, About: spans(o.About),
-				Scope: o.Scope, OwnerOnly: o.OwnerOnly, Params: fields(o.Params), Responses: []docResponse{}, Curl: curlOf(docBase, o)}
+			op := docOp{Anchor: OpAnchor(o), Method: o.Method, Tone: methodTone(o.Method), Path: o.Path, Summary: o.Summary, About: spans(o.About),
+				Scope: o.Scope, OwnerOnly: o.OwnerOnly, Params: fields(o.Params), Responses: []docResponse{}, Curl: curlOf(Base, o)}
 			if o.Body != nil {
 				op.Body = &docBody{Fields: fields(o.Body.Fields)}
 				if o.Body.Of != "" {
@@ -142,14 +142,14 @@ func docViewOf(doc APIDoc) docView {
 	}
 	v.Problems = []docProblem{}
 	for _, p := range doc.Problems {
-		v.Problems = append(v.Problems, docProblem{problemAnchor(p.Name), p.Type, spans(p.About)})
+		v.Problems = append(v.Problems, docProblem{ProblemAnchor(p.Name), p.Type, spans(p.About)})
 	}
 	return v
 }
 
-// withBase puts the server's address into a built page in docBase's place.
-func withBase(page []byte, base string) []byte {
-	return []byte(strings.ReplaceAll(string(page), docBase, htmlEscaper.Replace(strings.TrimRight(base, "/"))))
+// WithBase puts the server's address into a built page in Base's place.
+func WithBase(page []byte, base string) []byte {
+	return []byte(strings.ReplaceAll(string(page), Base, htmlEscaper.Replace(strings.TrimRight(base, "/"))))
 }
 
 var htmlEscaper = strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;", `"`, "&#34;", "'", "&#39;")

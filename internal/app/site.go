@@ -10,6 +10,10 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/shutthegoatup/prospector/api"
+
+	"github.com/shutthegoatup/prospector/internal/apidoc"
+
 	"github.com/shutthegoatup/prospector/internal/request"
 )
 
@@ -100,7 +104,7 @@ func (a *App) frontPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("content-type", "text/html; charset=utf-8")
-	_, _ = w.Write(withBase(b, a.baseURL(r)))
+	_, _ = w.Write(apidoc.WithBase(b, a.baseURL(r)))
 }
 
 // apiDocPage serves /api, with this server's address in its examples.
@@ -112,5 +116,28 @@ func (a *App) apiDocPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("content-type", "text/html; charset=utf-8")
-	_, _ = w.Write(withBase(b, a.baseURL(r)))
+	_, _ = w.Write(apidoc.WithBase(b, a.baseURL(r)))
+}
+
+// apiProblem sends a problem type's link to its entry on the reference page, so the
+// type a client was given leads somewhere a person can read.
+func (a *App) apiProblem() http.HandlerFunc {
+	spec, err := api.Spec()
+	if err != nil {
+		log.Fatalf("the API spec: %v", err)
+	}
+	known := map[string]bool{}
+	for _, p := range apidoc.ProblemsOf(spec) {
+		if p.Type != string(api.ProblemTypeUntyped) {
+			known[p.Name] = true
+		}
+	}
+	return func(w http.ResponseWriter, r *http.Request) {
+		name := r.PathValue("name")
+		if !known[name] {
+			http.NotFound(w, r)
+			return
+		}
+		http.Redirect(w, r, "/api#"+apidoc.ProblemAnchor(name), http.StatusFound)
+	}
 }

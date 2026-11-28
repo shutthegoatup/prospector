@@ -1,7 +1,6 @@
-package app
+package apidoc
 
 import (
-	"log"
 	"maps"
 	"net/http"
 	"slices"
@@ -12,7 +11,6 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 
-	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/identity"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
@@ -20,66 +18,66 @@ import (
 // The page at /api is the API's contract, drawn from api/openapi.yaml as people read
 // it: public, as the spec itself is, and with no script (see apidoc_view.go).
 
-type APIDoc struct {
+type Doc struct {
 	Title, Version string
 	Intro          []string
 	Base           string
-	Scopes         []APIScope
-	Groups         []APIGroup
-	Schemas        []APISchema
-	Problems       []APIProblem
+	Scopes         []Scope
+	Groups         []Group
+	Schemas        []Schema
+	Problems       []Problem
 }
 
-// APIProblem is a problem type a client acts on, with its entry on the page.
-type APIProblem struct{ Type, Name, About string }
+// Problem is a problem type a client acts on, with its entry on the page.
+type Problem struct{ Type, Name, About string }
 
-func problemAnchor(name string) string { return "problem-" + name }
+func ProblemAnchor(name string) string { return "problem-" + name }
 
-type APIScope struct {
+type Scope struct {
 	Name, What string
 	Owner      bool
 }
 
-type APIGroup struct {
+type Group struct {
 	Name, About string
-	Ops         []APIOp
+	Ops         []Op
 }
 
-type APIOp struct {
+type Op struct {
 	ID, Method, Path, Summary, About, Scope string
 	OwnerOnly                               bool
-	Params                                  []APIField
-	Body                                    *APISchema
+	Params                                  []Field
+	Body                                    *Schema
 	Responses                               []APIResponse
 }
 
 type APIResponse struct{ Code, About, Type string }
 
-type APISchema struct {
+type Schema struct {
 	Name, About string
-	Fields      []APIField
+	Fields      []Field
 	Enum        []string
 	// Of is what an inline or array body is made of, when it has no fields of its own.
 	Of string
 }
 
-type APIField struct {
+type Field struct {
 	Name, Type, About string
 	Required, Write   bool
 }
 
-func apiDocOf(spec *openapi3.T) APIDoc {
-	doc := APIDoc{Title: spec.Info.Title, Version: spec.Info.Version}
+func Of(spec *openapi3.T) Doc {
+	doc := Doc{Title: spec.Info.Title, Version: spec.Info.Version}
 	for p := range strings.SplitSeq(strings.TrimSpace(spec.Info.Description), "\n\n") {
 		doc.Intro = append(doc.Intro, cleantext.OneLine(p))
 	}
 	for _, s := range identity.Scopes {
-		doc.Scopes = append(doc.Scopes, APIScope{Name: s.Name, What: s.What.Error(), Owner: ownersOnly(s.Name)})
+		doc.Scopes = append(doc.Scopes, Scope{Name: s.Name, What: s.What.Error(), Owner: identity.OwnersOnly(s.Name)})
 	}
-	groups := map[string]*APIGroup{}
+	groups := map[string]*Group{}
 	var order []string
 	for _, t := range spec.Tags {
-		groups[t.Name] = &APIGroup{Name: t.Name, About: t.Description}
+		groups[t.Name] = &Group{Name: t.Name, About: t.Description}
 		order = append(order, t.Name)
 	}
 	paths := spec.Paths.InMatchingOrder()
@@ -92,14 +90,14 @@ func apiDocOf(spec *openapi3.T) APIDoc {
 			if op == nil {
 				continue
 			}
-			o := APIOp{ID: op.OperationID, Method: method, Path: path, Summary: op.Summary, About: cleantext.OneLine(op.Description)}
-			s := opScopes(op)
-			o.Scope, o.OwnerOnly = strings.Join(s, " or "), slices.ContainsFunc(s, ownersOnly)
+			o := Op{ID: op.OperationID, Method: method, Path: path, Summary: op.Summary, About: cleantext.OneLine(op.Description)}
+			s := OpScopes(op)
+			o.Scope, o.OwnerOnly = strings.Join(s, " or "), slices.ContainsFunc(s, identity.OwnersOnly)
 			for _, p := range append(slices.Clone(item.Parameters), op.Parameters...) {
 				if p.Value.Name == "org" {
 					continue
 				}
-				o.Params = append(o.Params, APIField{Name: p.Value.Name, Type: typeOf(p.Value.Schema), Required: p.Value.Required, About: cleantext.OneLine(p.Value.Description)})
+				o.Params = append(o.Params, Field{Name: p.Value.Name, Type: typeOf(p.Value.Schema), Required: p.Value.Required, About: cleantext.OneLine(p.Value.Description)})
 			}
 			if op.RequestBody != nil {
 				if mt := op.RequestBody.Value.Content.Get("application/json"); mt != nil {
@@ -121,7 +119,7 @@ func apiDocOf(spec *openapi3.T) APIDoc {
 				tag = op.Tags[0]
 			}
 			if groups[tag] == nil {
-				groups[tag] = &APIGroup{Name: tag}
+				groups[tag] = &Group{Name: tag}
 				order = append(order, tag)
 			}
 			groups[tag].Ops = append(groups[tag].Ops, o)
@@ -134,19 +132,19 @@ func apiDocOf(spec *openapi3.T) APIDoc {
 	for _, name := range names {
 		doc.Schemas = append(doc.Schemas, schemaOf(name, spec.Components.Schemas[name]))
 	}
-	doc.Problems = problemsOf(spec)
+	doc.Problems = ProblemsOf(spec)
 	return doc
 }
 
 const problemPrefix = "/api/problems/"
 
-func problemsOf(spec *openapi3.T) []APIProblem {
+func ProblemsOf(spec *openapi3.T) []Problem {
 	kinds := spec.Components.Schemas["ProblemType"].Value
 	about, _ := kinds.Extensions["x-enum-descriptions"].([]any)
-	var out []APIProblem
+	var out []Problem
 	for i, e := range kinds.Enum {
 		t, _ := e.(string)
-		p := APIProblem{Type: t, Name: strings.TrimPrefix(t, problemPrefix)}
+		p := Problem{Type: t, Name: strings.TrimPrefix(t, problemPrefix)}
 		if i < len(about) {
 			p.About, _ = about[i].(string)
 		}
@@ -155,31 +153,8 @@ func problemsOf(spec *openapi3.T) []APIProblem {
 	return out
 }
 
-// apiProblem sends a problem type's link to its entry on the reference page, so the
-// type a client was given leads somewhere a person can read.
-func (a *App) apiProblem() http.HandlerFunc {
-	spec, err := api.Spec()
-	if err != nil {
-		log.Fatalf("the API spec: %v", err)
-	}
-	known := map[string]bool{}
-	for _, p := range problemsOf(spec) {
-		if p.Type != string(api.ProblemTypeUntyped) {
-			known[p.Name] = true
-		}
-	}
-	return func(w http.ResponseWriter, r *http.Request) {
-		name := r.PathValue("name")
-		if !known[name] {
-			http.NotFound(w, r)
-			return
-		}
-		http.Redirect(w, r, "/api#"+problemAnchor(name), http.StatusFound)
-	}
-}
-
-func schemaOf(name string, ref *openapi3.SchemaRef) APISchema {
-	out := APISchema{Name: name}
+func schemaOf(name string, ref *openapi3.SchemaRef) Schema {
+	out := Schema{Name: name}
 	if ref == nil || ref.Value == nil {
 		return out
 	}
@@ -218,7 +193,7 @@ func schemaOf(name string, ref *openapi3.SchemaRef) APISchema {
 		if prop.Value != nil {
 			about = cleantext.OneLine(prop.Value.Description)
 		}
-		out.Fields = append(out.Fields, APIField{Name: p, Type: typeOf(prop), Required: slices.Contains(s.Required, p), About: about,
+		out.Fields = append(out.Fields, Field{Name: p, Type: typeOf(prop), Required: slices.Contains(s.Required, p), About: about,
 			Write: prop.Value != nil && prop.Value.WriteOnly})
 	}
 	return out
@@ -270,12 +245,12 @@ func codeSpans(s string) []textSpan {
 	return out
 }
 
-func opAnchor(o APIOp) string { return "op-" + o.ID }
+func OpAnchor(o Op) string { return "op-" + o.ID }
 
 func schemaAnchor(name string) string { return "schema-" + name }
 
 // schemaLink is the anchor for a type that names a component, or "" for a plain type.
-func schemaLink(doc APIDoc, t string) string {
+func schemaLink(doc Doc, t string) string {
 	name := strings.TrimSuffix(strings.TrimSuffix(t, "?"), "[]")
 	for _, s := range doc.Schemas {
 		if s.Name == name {
@@ -298,7 +273,7 @@ func methodTone(m string) string {
 }
 
 // curlOf is the operation as a shell command, for the reader's own organisation.
-func curlOf(base string, o APIOp) string {
+func curlOf(base string, o Op) string {
 	path := strings.ReplaceAll(o.Path, "{org}", "your-org")
 	var b strings.Builder
 	b.WriteString("curl")
@@ -314,7 +289,7 @@ func curlOf(base string, o APIOp) string {
 
 // exampleOf is a body with each required field, and the first few others, filled in
 // with a placeholder of its type.
-func exampleOf(s *APISchema) string {
+func exampleOf(s *Schema) string {
 	var parts []string
 	for i, f := range s.Fields {
 		if !f.Required && i > 3 {
@@ -332,4 +307,17 @@ func exampleOf(s *APISchema) string {
 		parts = append(parts, `"`+f.Name+`": `+v)
 	}
 	return "{" + strings.Join(parts, ", ") + "}"
+}
+
+// OpScopes are the scopes a key may make an operation with, any one of them.
+func OpScopes(op *openapi3.Operation) []string {
+	var out []string
+	if op.Security != nil {
+		for _, req := range *op.Security {
+			if s := req["bearer"]; len(s) > 0 {
+				out = append(out, s[0])
+			}
+		}
+	}
+	return out
 }
