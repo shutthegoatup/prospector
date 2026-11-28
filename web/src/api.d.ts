@@ -2869,7 +2869,7 @@ export interface components {
             ok: boolean;
         };
         AgentFactIn: {
-            /** @description What the fact is about, e.g. team_page or press, or one of the things the organisation looks for. */
+            /** @description What the fact is about, e.g. team_page or press; owned_by for who owns the company or its parent; status for it being dissolved, in administration or acquired; or one of the things the organisation looks for. */
             field: string;
             /** @description The fact itself, one sentence; for answer unknown, where you looked. */
             value: string;
@@ -2918,7 +2918,7 @@ export interface components {
             id: number;
             /** @description The name it is filed under, which can differ from yours if the domain was already known. */
             name: string;
-            /** @description The company was already known; facts it didn't have were still added. */
+            /** @description The company was already known; facts it didn't have were still added, and a domain, country or segment other than the one on file is kept as a fact beside it. */
             existed: boolean;
             stage: string;
         };

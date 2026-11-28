@@ -41,7 +41,7 @@ func (a *App) dueByStep(q *request.Req, now time.Time) map[string][]store.Contac
 		out[s.Key], _ = a.s.Due(q.Org.ID, s.Key, now, q.Org.Settings)
 	}
 	convs := a.conversations(q)
-	day := now.Format("2006-01-02")
+	day := now.Format(time.DateOnly)
 	for _, list := range convs {
 		for _, c := range list {
 			if NeedsNextStep(c, day) {
@@ -101,17 +101,17 @@ func (a *App) todayElsewhere(org int64, now time.Time, d *TodayData) error {
 	}
 	for _, list := range others {
 		for _, o := range list {
-			if o.NeedsNextStep(now.Format("2006-01-02")) {
+			if o.NeedsNextStep(now.Format(time.DateOnly)) {
 				d.Deals++
 			}
 		}
 	}
-	subs, err := a.s.Subscriptions(org, 0, now.Format(store.DayLayout))
+	subs, err := a.s.Subscriptions(org, 0, now.Format(time.DateOnly))
 	if err != nil {
 		return err
 	}
 	d.Enquiries = a.s.EnquiryCounts(org)["state:"+tickets.EnquiryOpen]
-	onboard, err := a.s.Onboardings(org, 0, now.Format(store.DayLayout))
+	onboard, err := a.s.Onboardings(org, 0, now.Format(time.DateOnly))
 	if err != nil {
 		return err
 	}
@@ -119,7 +119,7 @@ func (a *App) todayElsewhere(org int64, now time.Time, d *TodayData) error {
 		d.Steps += ob.Late + ob.DueToday
 	}
 	for _, sub := range subs {
-		if sub.Soon(now.Format(store.DayLayout)) {
+		if sub.Soon(now.Format(time.DateOnly)) {
 			d.Subs++
 		}
 	}

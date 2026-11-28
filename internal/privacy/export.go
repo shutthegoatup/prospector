@@ -8,6 +8,8 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/shutthegoatup/prospector/internal/crm"
+	"github.com/shutthegoatup/prospector/internal/identity"
 	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
@@ -328,4 +330,10 @@ func (s *PrivacyStore) ExportOrg(org int64, actor string) (*OrgExport, error) {
 
 // PrivacyStore is the work across every area: exporting and erasing a person or an
 // organisation's data, and the snapshots it is restored from.
-type PrivacyStore struct{ *store.Core }
+// PrivacyStore holds the identity and crm areas for what it reads of them, such as the
+// organisation an import is for and who may be added.
+type PrivacyStore struct {
+	*store.Core
+	Identity *identity.IdentityStore
+	CRM      *crm.CRMStore
+}

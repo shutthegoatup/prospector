@@ -36,9 +36,9 @@ func mustOrg(t *testing.T, s *Store, slug string) *store.Org {
 }
 
 // readFixtures parses testdata/, invented companies and people only.
-func readFixtures(t *testing.T) *ImportPayload {
+func readFixtures(t *testing.T) *privacy.ImportPayload {
 	t.Helper()
-	p, err := ReadRepo("testdata", "example.co")
+	p, err := privacy.ReadRepo("testdata", "example.co")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,7 +48,7 @@ func readFixtures(t *testing.T) *ImportPayload {
 func TestFixturesParse(t *testing.T) {
 	t.Parallel()
 	p := readFixtures(t)
-	byKey := map[string]Draft{}
+	byKey := map[string]privacy.Draft{}
 	for _, d := range p.Drafts {
 		byKey[d.Key] = d
 	}

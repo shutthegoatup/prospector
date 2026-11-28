@@ -1,4 +1,4 @@
-package app
+package privacy
 
 import (
 	"encoding/csv"
@@ -10,7 +10,6 @@ import (
 
 	"github.com/shutthegoatup/prospector/internal/cleantext"
 
-	"github.com/shutthegoatup/prospector/internal/privacy"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
 
@@ -42,9 +41,9 @@ type SentLogEntry struct {
 }
 
 type ImportPayload struct {
-	Drafts    []Draft              `json:"drafts"`
-	Companies []privacy.CompanyRow `json:"companies"`
-	SentLog   []SentLogEntry       `json:"sent_log"`
+	Drafts    []Draft        `json:"drafts"`
+	Companies []CompanyRow   `json:"companies"`
+	SentLog   []SentLogEntry `json:"sent_log"`
 }
 
 var (
@@ -302,7 +301,7 @@ func ReadRepo(repo, ownDomain string) (*ImportPayload, error) {
 		return nil, err
 	}
 	for _, rec := range records[1:] {
-		c := privacy.CompanyRow{}
+		c := CompanyRow{}
 		for i, h := range records[0] {
 			c[h] = rec[i]
 		}

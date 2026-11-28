@@ -177,10 +177,10 @@ const companyNotRejected = "(company_id is null" +
 // MarkDate compares days as text, in the zone today() uses: parsing the day as UTC
 // midnight would call today "the future" for the first hours of it east of UTC.
 func MarkDate(date string, now time.Time) error {
-	if _, err := time.Parse("2006-01-02", date); err != nil {
+	if _, err := store.ParseDay(date); err != nil {
 		return say.New("date is YYYY-MM-DD")
 	}
-	if date > now.Format("2006-01-02") {
+	if date > now.Format(time.DateOnly) {
 		return say.New("date is in the future")
 	}
 	return nil

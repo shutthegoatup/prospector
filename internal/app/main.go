@@ -20,6 +20,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/identity"
 	"github.com/shutthegoatup/prospector/internal/mailer"
+	"github.com/shutthegoatup/prospector/internal/privacy"
 	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
@@ -109,7 +110,7 @@ func run(args []string) error {
 		if len(rest) < 1 {
 			return fmt.Errorf("usage: prospector push https://host/o/<org> [--dir=.] [--own-domain=…]")
 		}
-		p, err := ReadRepo(opts["dir"], opts["own-domain"])
+		p, err := privacy.ReadRepo(opts["dir"], opts["own-domain"])
 		if err != nil {
 			return err
 		}
@@ -300,7 +301,7 @@ func run(args []string) error {
 	}
 	switch cmd {
 	case "import":
-		p, err := ReadRepo(opts["dir"], opts["own-domain"])
+		p, err := privacy.ReadRepo(opts["dir"], opts["own-domain"])
 		if err != nil {
 			return err
 		}

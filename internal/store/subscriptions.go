@@ -51,10 +51,8 @@ const SubEnding = "ending"
 
 const SubEnded = "ended"
 
-const DayLayout = "2006-01-02"
-
 func ParseDay(text string) (time.Time, error) {
-	d, err := time.Parse(DayLayout, text)
+	d, err := time.Parse(time.DateOnly, text)
 	// A year typed short ("0026") would otherwise be terms counted for two thousand years.
 	if err != nil || d.Year() < 1990 || d.Year() > 2200 {
 		return d, say.Errorf("%q isn't a date", text)
@@ -146,7 +144,7 @@ func (s Subscription) On(day string) Standing {
 	if err != nil {
 		return Standing{Status: SubScheduled}
 	}
-	text := func(d time.Time) string { return d.Format(DayLayout) }
+	text := func(d time.Time) string { return d.Format(time.DateOnly) }
 	// Notice is counted back from the day the next term would start; with none to give,
 	// the last day of the term is still in time.
 	cancelBy := func(last time.Time) string { return text(last.AddDate(0, 0, 1-max(s.NoticeDays, 1))) }
@@ -194,7 +192,7 @@ func (s Subscription) On(day string) Standing {
 }
 
 func MustDay(text string) time.Time {
-	d, _ := time.Parse(DayLayout, text)
+	d, _ := time.Parse(time.DateOnly, text)
 	return d
 }
 
@@ -220,7 +218,7 @@ const SoonDays = 30
 // Within is a standing whose next date to know about falls within soonDays of day.
 func (st Standing) Within(day string) bool {
 	at := st.Attention()
-	return st.Status != SubEnded && at >= day && at <= MustDay(day).AddDate(0, 0, SoonDays).Format(DayLayout)
+	return st.Status != SubEnded && at >= day && at <= MustDay(day).AddDate(0, 0, SoonDays).Format(time.DateOnly)
 }
 
 // MonthsNow is how long the term day falls in runs: the commitment, then whatever follows it.
@@ -229,7 +227,7 @@ func (s Subscription) MonthsNow(day string) int {
 	if err != nil || s.TermMonths <= 0 {
 		return s.Period()
 	}
-	if s.Then == ThenRolls && day >= AddMonths(start, s.TermMonths).Format(DayLayout) {
+	if s.Then == ThenRolls && day >= AddMonths(start, s.TermMonths).Format(time.DateOnly) {
 		return s.Period()
 	}
 	return s.TermMonths

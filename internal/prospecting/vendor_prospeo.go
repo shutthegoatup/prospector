@@ -1,4 +1,4 @@
-package app
+package prospecting
 
 import (
 	"bytes"
@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/say"
 )
 
@@ -17,12 +16,10 @@ import (
 // profile, give a work email, a mobile and the profile.
 type prospeo struct{}
 
-func init() { prospecting.Vendors["prospeo"] = prospeo{} }
-
 func (prospeo) Name() string     { return "Prospeo" }
 func (prospeo) Fields() []string { return []string{"email", "phone", "linkedin"} }
 
-func (prospeo) Find(ctx context.Context, c *http.Client, base, key string, p prospecting.EnrichPerson, field string) (prospecting.VendorFind, error) {
+func (prospeo) Find(ctx context.Context, c *http.Client, base, key string, p EnrichPerson, field string) (VendorFind, error) {
 	if base == "" {
 		base = "https://api.prospeo.io"
 	}
@@ -40,7 +37,7 @@ func (prospeo) Find(ctx context.Context, c *http.Client, base, key string, p pro
 		}
 	}
 	if data["linkedin_url"] == "" && data["company_website"] == "" && data["company_name"] == "" {
-		return prospecting.VendorFind{}, say.New("it needs the person's name and company, or their LinkedIn profile")
+		return VendorFind{}, say.New("it needs the person's name and company, or their LinkedIn profile")
 	}
 	ask := map[string]any{"data": data}
 	if field == "phone" {
@@ -50,13 +47,13 @@ func (prospeo) Find(ctx context.Context, c *http.Client, base, key string, p pro
 	raw, _ := json.Marshal(ask)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, base+"/enrich-person", bytes.NewReader(raw))
 	if err != nil {
-		return prospecting.VendorFind{}, err
+		return VendorFind{}, err
 	}
 	req.Header.Set("X-KEY", key)
 	req.Header.Set("Content-Type", "application/json")
 	res, err := c.Do(req)
 	if err != nil {
-		return prospecting.VendorFind{}, err
+		return VendorFind{}, err
 	}
 	defer res.Body.Close()
 	var body struct {
@@ -77,20 +74,20 @@ func (prospeo) Find(ctx context.Context, c *http.Client, base, key string, p pro
 		} `json:"person"`
 	}
 	if err := json.NewDecoder(io.LimitReader(res.Body, 1<<20)).Decode(&body); err != nil {
-		return prospecting.VendorFind{}, say.Errorf("an answer that isn't JSON (%s)", res.Status)
+		return VendorFind{}, say.Errorf("an answer that isn't JSON (%s)", res.Status)
 	}
 	if body.Error || res.StatusCode != http.StatusOK {
 		if body.ErrorCode == "NO_MATCH" {
-			return prospecting.VendorFind{}, nil
+			return VendorFind{}, nil
 		}
 		why := body.ErrorCode
 		if why == "" {
 			why = res.Status
 		}
-		return prospecting.VendorFind{}, errors.New(prospeoErrors[why] + why)
+		return VendorFind{}, errors.New(prospeoErrors[why] + why)
 	}
 	if body.Person == nil {
-		return prospecting.VendorFind{}, nil
+		return VendorFind{}, nil
 	}
 	// Only what was paid for is shown in full; anything else is masked with stars.
 	shown := func(revealed bool, v string) string {
@@ -103,23 +100,23 @@ func (prospeo) Find(ctx context.Context, c *http.Client, base, key string, p pro
 	case "email":
 		e := body.Person.Email
 		if e == nil {
-			return prospecting.VendorFind{}, nil
+			return VendorFind{}, nil
 		}
 		status := "guess"
 		if e.Status == "VERIFIED" {
 			status = "verified"
 		}
 		if v := shown(e.Revealed, e.Email); v != "" {
-			return prospecting.VendorFind{Value: v, EmailStatus: status}, nil
+			return VendorFind{Value: v, EmailStatus: status}, nil
 		}
 	case "phone":
 		if m := body.Person.Mobile; m != nil && m.Status == "VERIFIED" {
-			return prospecting.VendorFind{Value: shown(m.Revealed, m.Mobile)}, nil
+			return VendorFind{Value: shown(m.Revealed, m.Mobile)}, nil
 		}
 	case "linkedin":
-		return prospecting.VendorFind{Value: strings.TrimSpace(body.Person.LinkedinURL)}, nil
+		return VendorFind{Value: strings.TrimSpace(body.Person.LinkedinURL)}, nil
 	}
-	return prospecting.VendorFind{}, nil
+	return VendorFind{}, nil
 }
 
 var prospeoErrors = map[string]string{
