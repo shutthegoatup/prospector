@@ -201,7 +201,12 @@ func TestTheFrontPageIsInTheVisitorsLanguage(t *testing.T) {
 		t.Errorf("Content-Language %q, Vary %q", got, res.Header.Get("Vary"))
 	}
 	// The hosted terms stay English, and say so.
-	if !strings.Contains(body, "prices exclude VAT") || !strings.Contains(body, `lang="en"`) {
+	start := strings.Index(body, `id="pricing"`)
+	if start < 0 {
+		t.Fatal("the front page has no pricing section")
+	}
+	pricing := body[start : start+strings.Index(body[start:], "</section>")]
+	if !strings.Contains(pricing, "prices exclude VAT") || !strings.Contains(pricing, `lang="en"`) {
 		t.Error("the prices aren't kept in English, marked as such")
 	}
 	if got, _ := inLanguage(t, visitor, srv.URL+"/", ""); got != pseudo {

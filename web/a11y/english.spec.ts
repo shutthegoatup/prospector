@@ -6,7 +6,7 @@ import { base, member, org, reader, seed } from "./world.ts";
 
 // In en-XA every word the app says is accented and bracketed, so plain letters left on a
 // page are words that never went through react-intl. A page is checked once its file is
-// off .oxlintrc.json's list of those still to be translated.
+// off .oxlintrc.json's list of those still to be translated (or kept English, as /api is).
 const untranslated = new Set<string>(
   (JSON.parse(readFileSync(new URL("../.oxlintrc.json", import.meta.url), "utf8")) as { overrides: { files: string[] }[] }).overrides.flatMap((o) => o.files),
 );
