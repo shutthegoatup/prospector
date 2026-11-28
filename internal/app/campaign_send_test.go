@@ -404,7 +404,7 @@ func TestCampaignSendingHoldsAtItsEdges(t *testing.T) {
 		if code, body := call(t, member, "POST", list+"/"+itoa(c.ID)+"/send", "application/json", map[string]any{}); code != http.StatusBadRequest || !strings.Contains(body, "sign in to") {
 			t.Errorf("sending through %s:%d with username %q: %d %s", m.Host, m.Port, m.Username, code, body)
 		}
-		if err := s.RemoveCampaign(o.ID, c.ID); err != nil {
+		if err := s.RemoveCampaign(o.ID, c.ID, "Owner One"); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -430,7 +430,7 @@ func TestCampaignSendingHoldsAtItsEdges(t *testing.T) {
 	if err := s.ErasePerson(o.ID, *hannah.ContactID, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	must(s.ResumeCampaign(o.ID, c.ID))
+	must(s.ResumeCampaign(o.ID, c.ID, "Owner One"))
 	a.sendRound(context.Background(), time.Now())
 	if got := box.to(); len(got) != 2 {
 		t.Errorf("after erasing someone still waiting, mailed %v", got)

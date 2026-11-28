@@ -333,7 +333,7 @@ func TestOnlyOwnersSetUpTheAgentAndOnlyWithASecretKey(t *testing.T) {
 	s, srv, _ := agentSite(t, fake)
 	o := must(s.OrgBySlug("alpha"))
 	grace := must(s.CreateUser("grace@example.com", "Grace Hopper", "grace's own password"))
-	if err := s.AddMember(o.ID, grace.ID, "member", grace.Name); err != nil {
+	if err := s.AddMember(o.ID, grace.ID, "member", grace.Name, "Owner One"); err != nil {
 		t.Fatal(err)
 	}
 	member := newMailClient()

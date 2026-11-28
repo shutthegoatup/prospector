@@ -17,7 +17,7 @@ func TestAnEnquiryWaitsToBeAnswered(t *testing.T) {
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	u := must(s.CreateUser("ada@example.com", "Ada Lovelace", "correct horse battery"))
-	if err := s.AddMember(o.ID, u.ID, "owner", u.Name); err != nil {
+	if err := s.AddMember(o.ID, u.ID, "owner", u.Name, "Owner One"); err != nil {
 		t.Fatal(err)
 	}
 	// Someone already known here, so what they send is matched to them and their company.

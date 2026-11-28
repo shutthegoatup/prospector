@@ -11,7 +11,7 @@ func TestRestoreDoesntHandOutADroppedPersonsID(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	if _, err := s.Import(o.ID, readFixtures(t)); err != nil {
+	if _, err := s.Import(o.ID, readFixtures(t), "import"); err != nil {
 		t.Fatal(err)
 	}
 	hannah := must(s.FindOne(o.ID, "Hannah"))

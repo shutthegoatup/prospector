@@ -23,7 +23,7 @@ func TestHistoryKeepsNoPersonalDetails(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if _, err := s.Import(o.ID, readFixtures(t)); err != nil {
+	if _, err := s.Import(o.ID, readFixtures(t), "import"); err != nil {
 		t.Fatal(err)
 	}
 	hannah := must(s.FindOne(o.ID, "Hannah"))

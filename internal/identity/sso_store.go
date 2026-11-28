@@ -71,7 +71,7 @@ func (s *SsoStore) AddSSODomain(org int64, domain, actor string) (*store.SSODoma
 		if err := tx.Create(d).Error; err != nil {
 			return err
 		}
-		return s.Log(tx, org, 0, nil, actor, "domain:add", &domain)
+		return s.Log(tx, org, 0, nil, actor, "sso:add-domain", &domain)
 	})
 	if store.BreaksRule(err) {
 		err = store.Conflict{Text: say.Errorf("%s is already listed", domain)}
@@ -100,7 +100,7 @@ func (s *SsoStore) VerifySSODomain(org, id int64, at time.Time, actor string) er
 		if res.Error != nil || res.RowsAffected == 0 {
 			return res.Error
 		}
-		return s.Log(tx, org, 0, nil, actor, "domain:verify", &d.Domain)
+		return s.Log(tx, org, 0, nil, actor, "sso:verify-domain", &d.Domain)
 	})
 }
 
@@ -110,7 +110,7 @@ func (s *SsoStore) RemoveSSODomain(org int64, domain, actor string) error {
 		if res.Error != nil || res.RowsAffected == 0 {
 			return res.Error
 		}
-		return s.Log(tx, org, 0, nil, actor, "domain:remove", &domain)
+		return s.Log(tx, org, 0, nil, actor, "sso:remove-domain", &domain)
 	})
 }
 

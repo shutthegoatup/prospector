@@ -168,7 +168,7 @@ func TestAnAgreementThatWentOutKeepsWhoItWentTo(t *testing.T) {
 	t.Parallel()
 	s, o, _, _, a, hannah, _ := preparing(t)
 	grace := must(s.CreateUser("grace@example.com", "Grace Hopper", "correct horse battery"))
-	if err := s.AddMember(o.ID, grace.ID, "member", "Ada Lovelace"); err != nil {
+	if err := s.AddMember(o.ID, grace.ID, "member", "Ada Lovelace", "Owner One"); err != nil {
 		t.Fatal(err)
 	}
 	h := must(s.AddRecipient(o, a.ID, signing.RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
@@ -230,7 +230,7 @@ func TestAnAgreementsRecipientsGoWithWhoTheyStandFor(t *testing.T) {
 	t.Parallel()
 	s, o, _, _, a, hannah, theo := preparing(t)
 	grace := must(s.CreateUser("grace@example.com", "Grace Hopper", "correct horse battery"))
-	if err := s.AddMember(o.ID, grace.ID, "member", "Ada Lovelace"); err != nil {
+	if err := s.AddMember(o.ID, grace.ID, "member", "Ada Lovelace", "Owner One"); err != nil {
 		t.Fatal(err)
 	}
 	h := must(s.AddRecipient(o, a.ID, signing.RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
@@ -344,7 +344,7 @@ func TestAnAgreementIsPreparedOnItsOwnPage(t *testing.T) {
 	}
 
 	grace := must(s.CreateUser("grace@example.com", "Grace Hopper", "correct horse battery"))
-	if err := s.AddMember(o.ID, grace.ID, "member", "Ada Lovelace"); err != nil {
+	if err := s.AddMember(o.ID, grace.ID, "member", "Ada Lovelace", "Owner One"); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.SetAreas(o.ID, grace.ID, []string{"support"}); err != nil {

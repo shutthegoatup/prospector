@@ -253,7 +253,7 @@ func seedFirst(t *testing.T, s *Store) *store.Org {
 	owner := must(s.CreateUser("owner@alpha.example", "Owner One", "a long enough password"))
 	scout := store.Actor{Name: "agent:" + theirs, KeyID: 1}
 	steps := []func() error{
-		func() error { return s.AddMember(first.ID, owner.ID, "owner", "") },
+		func() error { return s.AddMember(first.ID, owner.ID, "owner", "", "Owner One") },
 		func() error { return s.SaveVoice(first.ID, owner.ID, theirs+" caller", theirs+" signature") },
 		func() error {
 			_, _, err := s.CreateKey(first.ID, theirs+" key", []string{"read"}, "Owner One")

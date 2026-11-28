@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"github.com/shutthegoatup/prospector/internal/identity"
 	"github.com/shutthegoatup/prospector/internal/sales"
@@ -47,7 +48,12 @@ func (s *OutreachStore) AddCampaign(org int64, in CampaignIn, actor string) (*st
 	if err := c.Fits(); err != nil {
 		return nil, err
 	}
-	return &c, s.DB.Create(&c).Error
+	return &c, s.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&c).Error; err != nil {
+			return err
+		}
+		return s.Log(tx, org, 0, nil, actor, "campaign:add", &c.Name)
+	})
 }
 
 // ChangeCampaign makes several changes to a draft, or none.
@@ -95,22 +101,25 @@ func (s *OutreachStore) ChangeCampaign(org, id int64, changes []store.Change, ac
 	return &c, err
 }
 
-func (s *OutreachStore) RemoveCampaign(org, id int64) error {
-	res := s.InOrg(org).Where("id = ? and status = ?", id, CampaignDraft).Delete(&store.Campaign{})
-	if res.Error != nil {
-		return res.Error
-	}
-	if res.RowsAffected == 0 {
-		var n int64
-		if err := s.InOrg(org).Model(&store.Campaign{}).Where("id = ?", id).Count(&n).Error; err != nil {
-			return err
+func (s *OutreachStore) RemoveCampaign(org, id int64, actor string) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
+		var c store.Campaign
+		res := tx.Clauses(clause.Returning{}).Where("org_id = ? and id = ? and status = ?", org, id, CampaignDraft).Delete(&c)
+		if res.Error != nil {
+			return res.Error
 		}
-		if n == 0 {
-			return store.NoSuch("no campaign %d", id)
+		if res.RowsAffected == 0 {
+			var n int64
+			if err := tx.Model(&store.Campaign{}).Where("org_id = ? and id = ?", org, id).Count(&n).Error; err != nil {
+				return err
+			}
+			if n == 0 {
+				return store.NoSuch("no campaign %d", id)
+			}
+			return say.New("only a draft can be removed; one that went is kept as a record of what was sent")
 		}
-		return say.New("only a draft can be removed; one that went is kept as a record of what was sent")
-	}
-	return nil
+		return s.Log(tx, org, 0, nil, actor, "campaign:remove", &c.Name)
+	})
 }
 
 // Campaigns are an organisation's, newest first.

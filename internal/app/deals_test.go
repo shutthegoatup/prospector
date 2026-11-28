@@ -58,7 +58,7 @@ func TestADealIsValuedOnceSomeoneReplies(t *testing.T) {
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	u := must(s.CreateUser("ada@example.com", "Ada Lovelace", "correct horse battery"))
-	if err := s.AddMember(o.ID, u.ID, "owner", u.Name); err != nil {
+	if err := s.AddMember(o.ID, u.ID, "owner", u.Name, "Owner One"); err != nil {
 		t.Fatal(err)
 	}
 	quiet := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Sven Dahl", Company: "Nordkap Boats"}, u.Name))
@@ -576,7 +576,7 @@ func TestARobotWorksDealsAndEnquiriesAsItsScopesAllow(t *testing.T) {
 	}
 
 	member := must(s.CreateUser("grace@example.com", "Grace Hopper", "correct horse battery"))
-	if err := s.AddMember(o.ID, member.ID, "member", "Ada Lovelace"); err != nil {
+	if err := s.AddMember(o.ID, member.ID, "member", "Ada Lovelace", "Owner One"); err != nil {
 		t.Fatal(err)
 	}
 	notOwner := newMailClient()

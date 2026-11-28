@@ -90,7 +90,7 @@ func mailSite(t *testing.T, configure func(*App)) (*Store, *httptest.Server, *ht
 	s.Keyring = mustKeys(t, "1:"+mailTestKey)
 	o := mustOrg(t, s, "alpha")
 	u := must(s.CreateUser("ada@example.com", "Ada Lovelace", "correct horse battery"))
-	if err := s.AddMember(o.ID, u.ID, "owner", u.Name); err != nil {
+	if err := s.AddMember(o.ID, u.ID, "owner", u.Name, "Owner One"); err != nil {
 		t.Fatal(err)
 	}
 	box := &outbox{}
@@ -381,7 +381,7 @@ func TestInvitationByEmail(t *testing.T) {
 
 	// Someone who already has an account is added without mail.
 	other := mustOrg(t, s, "beta")
-	if err := s.AddMember(other.ID, must(s.UserByEmail("ada@example.com")).ID, "owner", "Ada"); err != nil {
+	if err := s.AddMember(other.ID, must(s.UserByEmail("ada@example.com")).ID, "owner", "Ada", "Owner One"); err != nil {
 		t.Fatal(err)
 	}
 	if code, _ := call(t, ada, "POST", srv.URL+"/o/beta/api/v1/members", "application/json", map[string]string{"email": "grace@example.com"}); code != http.StatusCreated {
@@ -513,7 +513,7 @@ func TestAnotherOrganisationsMailServerNeverCarriesAnExistingAccountsLink(t *tes
 
 	mallory := must(s.CreateUser("mallory@example.com", "Mallory", "mallory's password"))
 	beta := mustOrg(t, s, "beta")
-	if err := s.AddMember(beta.ID, mallory.ID, "owner", mallory.Name); err != nil {
+	if err := s.AddMember(beta.ID, mallory.ID, "owner", mallory.Name, "Owner One"); err != nil {
 		t.Fatal(err)
 	}
 	theirs := newMailClient()

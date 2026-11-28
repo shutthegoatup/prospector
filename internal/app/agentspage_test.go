@@ -97,7 +97,7 @@ func TestTheAgentsPageSaysWhichAgentsAreReady(t *testing.T) {
 
 	// A member sees each agent's state but not its setup.
 	u := must(s.CreateUser("grace@example.com", "Grace Hopper", "correct horse battery"))
-	if err := s.AddMember(o.ID, u.ID, "member", u.Name); err != nil {
+	if err := s.AddMember(o.ID, u.ID, "member", u.Name, "Owner One"); err != nil {
 		t.Fatal(err)
 	}
 	grace := newMailClient()

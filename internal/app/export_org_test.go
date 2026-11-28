@@ -22,7 +22,7 @@ func TestExportOrg(t *testing.T) {
 		}
 	}
 	for _, org := range []*store.Org{o, other} {
-		if _, err := s.Import(org.ID, readFixtures(t)); err != nil {
+		if _, err := s.Import(org.ID, readFixtures(t), "import"); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -41,7 +41,7 @@ func TestExportOrg(t *testing.T) {
 	theirKey, _, err := s.CreateKey(other.ID, "their-bot", []string{"read"}, "test")
 	do(err)
 	outsider := must(s.CreateUser("carol@example.com", "Carol Outsider", "correct horse battery"))
-	do(s.AddMember(other.ID, outsider.ID, "owner", outsider.Name))
+	do(s.AddMember(other.ID, outsider.ID, "owner", outsider.Name, "Owner One"))
 	do(s.SaveSSO(&store.SSOConnection{OrgID: o.ID, Issuer: "https://id.larkmoor.example", ClientID: "prospector-client", ClientSecret: "s3cret-client-value"}, "ada"))
 	do(s.DB.Create(&store.SSODomain{OrgID: o.ID, Domain: "alpha.example", Token: "dns-proof-token"}).Error)
 	do(s.SaveOrgMail(o.ID, &store.OrgMail{OrgID: o.ID, Host: "smtp.alpha.example", Port: 587, Username: "mailer", Password: "sealed-mail-password", Sender: "Alpha <hello@alpha.example>"}, "Owner One"))
@@ -50,7 +50,7 @@ func TestExportOrg(t *testing.T) {
 	jar, _ := cookiejar.New(nil)
 	bob := &http.Client{Jar: jar}
 	u := must(s.CreateUser("bob@example.com", "Bob", "correct horse battery"))
-	do(s.AddMember(o.ID, u.ID, "member", u.Name))
+	do(s.AddMember(o.ID, u.ID, "member", u.Name, "Owner One"))
 	res, err := signInWith(bob, srv.URL, "bob@example.com", "correct horse battery")
 	if err != nil || res.StatusCode != http.StatusOK {
 		t.Fatalf("login: %v", err)

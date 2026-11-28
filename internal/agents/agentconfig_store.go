@@ -42,12 +42,12 @@ func (s *AgentStore) AgentNamed(org int64, name string) (*store.Agent, error) {
 func (s *AgentStore) SaveAgentRow(org int64, c *store.Agent) error {
 	c.OrgID = org
 	return s.DB.Transaction(func(tx *gorm.DB) error {
-		action := "agent:change"
+		action := "agents:change"
 		if c.ID == 0 {
 			if err := tx.Create(c).Error; err != nil {
 				return err
 			}
-			action = "agent:new"
+			action = "agents:new"
 		} else {
 			res := tx.Model(&store.Agent{}).Where("id = ? and org_id = ?", c.ID, org).
 				Select("name", "kind", "base_url", "fallback_id", "fallback_minutes", "thinking_off", "api_key", "model", "tools_url", "search_url", "models", "tools", "allowed", "problem", "checked_at", "updated_by", "updated_at").
@@ -99,6 +99,6 @@ func (s *AgentStore) DeleteAgent(org, id int64, actor string) error {
 		if err := tx.Delete(&c).Error; err != nil {
 			return err
 		}
-		return s.Log(tx, org, 0, nil, actor, "agent:remove", &c.Name)
+		return s.Log(tx, org, 0, nil, actor, "agents:remove", &c.Name)
 	})
 }

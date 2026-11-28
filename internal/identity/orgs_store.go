@@ -185,7 +185,7 @@ func (s *IdentityStore) OrgBySlug(slug string) (*store.Org, error) {
 }
 
 // AddMember adds a user to an organisation, or changes the role of one already in it.
-func (s *IdentityStore) AddMember(org, user int64, role, callerName string) error {
+func (s *IdentityStore) AddMember(org, user int64, role, callerName, actor string) error {
 	if role != "owner" && role != "member" {
 		return say.Errorf("a role is owner or member, not %q", role)
 	}
@@ -196,17 +196,24 @@ func (s *IdentityStore) AddMember(org, user int64, role, callerName string) erro
 		var m store.Membership
 		err := tx.Where("org_id = ? and user_id = ?", org, user).First(&m).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return tx.Create(&store.Membership{OrgID: org, UserID: user, Role: role, CallerName: callerName}).Error
+			var u store.User
+			if err := tx.First(&u, user).Error; err != nil {
+				return err
+			}
+			if err := tx.Create(&store.Membership{OrgID: org, UserID: user, Role: role, CallerName: callerName}).Error; err != nil {
+				return err
+			}
+			return s.Log(tx, org, 0, nil, actor, "member:add", new(u.Email+": "+role))
 		}
 		if err != nil {
 			return err
 		}
-		return setRole(tx, org, &m, role)
+		return s.setRole(tx, org, &m, role, actor)
 	})
 }
 
 // SetRole changes the role of someone already in the organisation.
-func (s *IdentityStore) SetRole(org, user int64, role string) error {
+func (s *IdentityStore) SetRole(org, user int64, role, actor string) error {
 	if role != "owner" && role != "member" {
 		return say.Errorf("a role is owner or member, not %q", role)
 	}
@@ -220,7 +227,7 @@ func (s *IdentityStore) SetRole(org, user int64, role string) error {
 		} else if err != nil {
 			return err
 		}
-		return setRole(tx, org, &m, role)
+		return s.setRole(tx, org, &m, role, actor)
 	})
 }
 

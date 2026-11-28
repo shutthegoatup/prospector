@@ -165,7 +165,7 @@ func (s apiServer) ChangeMember(ctx context.Context, in api.ChangeMemberRequestO
 		return nil, err
 	}
 	if in.Body.Role != "" {
-		if err := s.a.s.SetRole(org, in.User, string(in.Body.Role)); err != nil {
+		if err := s.a.s.SetRole(org, in.User, string(in.Body.Role), request.ReqFrom(ctx).Actor()); err != nil {
 			return nil, err
 		}
 	}

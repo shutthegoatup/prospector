@@ -11,57 +11,62 @@ import (
 	"time"
 
 	"github.com/shutthegoatup/prospector/internal/crm"
+	"github.com/shutthegoatup/prospector/internal/marketing"
 	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/store"
 	"github.com/shutthegoatup/prospector/internal/tickets"
 )
 
+const (
+	drafting = "a draft being written; once sent, its own record (agreement_events, or the campaign's recipients) holds it"
+	queue    = "the sending queue: each recipient's row is its record"
+	asWas    = "puts rows back as they were, their history with them"
+)
+
 // leavesNoHistory are the methods that change an organisation's rows without an event.
 var leavesNoHistory = map[string]string{
 	"SaveVoice": "a member's own preferences", "SetAreas": "a member's own preferences",
-	"ChangeAgreement":    "a draft being written; once sent, its own chain (agreement_events) records it",
-	"PutAgreementFields": "a draft being written; once sent, its own chain (agreement_events) records it",
-	"RemoveRecipient":    "a draft being written; once sent, its own chain (agreement_events) records it",
-	"RenameKey":          "follows an agent's rename, which SaveAgentRow logs",
-	"AddEnquiry":         "logged on its company; spam, or one from no company held here, is a row in Enquiries with nothing to hang an entry on",
-	"Suppress":           "the list keeps who added each address and why; an address in the history would outlive erasing them",
-	"MailFailed":         "a bounce or complaint is kept on the suppression list and the mail it came back from",
-	"AddRun":             "an agent's run is shown with its agent; what it does is logged as it does it",
-	"CampaignWent":       "the sending queue: each recipient's row is its record",
-	"CampaignFailed":     "the sending queue: each recipient's row is its record",
-	"SettleMail":         "the sending queue: each recipient's row is its record",
+	"ChangeAgreement": drafting, "PutAgreementFields": drafting, "PutAgreementFile": drafting, "AddRecipient": drafting, "ChangeRecipient": drafting,
+	"RemoveRecipient": drafting, "ChangeCampaign": drafting,
+	"TrySeal":      "a trial seal of a draft, which keeps nothing",
+	"RenameKey":    "follows an agent's rename, which SaveAgentRow logs",
+	"AddEnquiry":   "logged on its company; spam, or one from no company held here, is a row in Enquiries with nothing to hang an entry on",
+	"MailFailed":   "a bounce or complaint is kept on the suppression list and the mail it came back from",
+	"AddRun":       "an agent's run is shown with its agent; what it does is logged as it does it",
+	"CampaignWent": queue, "CampaignFailed": queue, "SettleMail": queue, "ClaimMail": queue, "SkipMail": queue, "FinishIfDone": queue,
+	"PauseCampaign":      "the server pauses a campaign whose mail keeps failing, and the campaign says why",
 	"StartReply":         "a reply waiting to go; SettleReply logs it once sent",
 	"SettleReply":        "one that failed to send is forgotten, as if never written",
 	"Spend":              "a vendor's monthly count of lookups",
-	"ReplaceContacts":    "a restore or import puts rows back as they were, their history with them",
+	"RedeemCustomerLink": "a customer signing in from their link",
+	"SaveOrg":            "only tests call it; ChangeSettings is how settings change, and it logs",
+	"ReplaceContacts":    asWas, "Restore": asWas, "ImportLegacy": asWas,
 }
 
 const (
-	notInState = "needs a run, a mail, a link or a claim in a state the seeded rows aren't in"
-	noValidArg = "the fuzzing's words don't make a call it accepts, so this can't tell"
+	notInState = "needs a run or a claim in a state the seeded rows aren't in; their own tests show what happens"
+	logsByHand = "logs, as read by hand; the fuzzing's words don't make a call it accepts"
 )
 
 // untried are the methods named for a change that the fuzzing never gets to make one.
 // The list should only shrink.
 var untried = map[string]string{
-	"AskRunStop": notInState, "Claim": notInState, "ClaimMail": notInState, "ClaimNext": notInState, "DropKeyClaims": notInState,
-	"EndRun": notInState, "FinishIfDone": notInState, "HoldRun": notInState, "RenewRun": notInState, "SkipMail": notInState,
-	"StopLapsedRun": notInState, "TakeOverRun": notInState, "PauseCampaign": notInState, "ResumeCampaign": notInState,
-	"RedeemCustomerLink": notInState, "TrySeal": notInState,
-	"AddCampaign": noValidArg, "AddMember": noValidArg, "AddRecipient": noValidArg, "AddRole": noValidArg, "AddSubscription": noValidArg,
-	"AgentAddContact": noValidArg, "AgentAddFact": noValidArg, "AgentAddRole": noValidArg, "AgentNote": noValidArg,
-	"ChangeCampaign": noValidArg, "ChangeContactFields": noValidArg, "ChangeDeal": noValidArg, "ChangeDealFields": noValidArg,
-	"ChangeOffering": noValidArg, "ChangeRecipient": noValidArg, "ChangeSettings": noValidArg, "ChangeSubscription": noValidArg,
-	"ChangeSubscriptionFields": noValidArg, "CreateKey": noValidArg, "Import": noValidArg, "ImportLegacy": noValidArg,
-	"InviteCustomer": noValidArg, "PickContactFor": noValidArg, "PutAgreementFile": noValidArg, "RemoveCampaign": noValidArg,
-	"RemoveDeal": noValidArg, "RemoveMember": noValidArg, "RemoveSSODomain": noValidArg, "Restore": noValidArg,
-	"SaveEnricher": noValidArg, "SaveOrg": noValidArg, "SetDealFields": noValidArg, "SetEnquiryFields": noValidArg,
-	"SetKeyScopes": noValidArg, "SetOnboardingStep": noValidArg, "SetRole": noValidArg, "StartDeal": noValidArg, "Unsuppress": noValidArg,
+	"AskRunStop": notInState, "Claim": notInState, "ClaimNext": notInState, "DropKeyClaims": notInState, "EndRun": notInState,
+	"HoldRun": notInState, "RenewRun": notInState, "StopLapsedRun": notInState, "TakeOverRun": notInState,
+	"AddCampaign": logsByHand, "AddMember": logsByHand, "AddRole": logsByHand, "AddSubscription": logsByHand,
+	"AgentAddContact": logsByHand, "AgentAddFact": logsByHand, "AgentAddRole": logsByHand, "AgentNote": logsByHand,
+	"ChangeContactFields": logsByHand, "ChangeDeal": logsByHand, "ChangeDealFields": logsByHand, "ChangeOffering": logsByHand,
+	"ChangeSettings": logsByHand, "ChangeSubscription": logsByHand, "ChangeSubscriptionFields": logsByHand, "CreateKey": logsByHand,
+	"InviteCustomer": logsByHand, "PickContactFor": logsByHand, "RemoveCampaign": logsByHand,
+	"RemoveDeal": logsByHand, "RemoveMember": logsByHand, "RemoveSSODomain": logsByHand, "ResumeCampaign": logsByHand,
+	"SaveEnricher": logsByHand, "SetDealFields": logsByHand, "SetEnquiryFields": logsByHand, "SetKeyScopes": logsByHand,
+	"SetOnboardingStep": logsByHand, "SetRole": logsByHand, "StartDeal": logsByHand, "Unsuppress": logsByHand,
+	"SendCampaign": logsByHand, "CancelCampaign": logsByHand,
 }
 
 // changesByName is what a method that changes things is named for, so one the fuzzing
 // never gets to write shows instead of passing for want of trying.
-var changesByName = regexp.MustCompile(`^(Add|Agent(Add|Draft|Finish|Mark|Note)|Ask|Change|Claim|Converse|Create|Decide|Delete|Drop|End|Erase|Finish|Hear|Hold|Import|Invite|Judge|Keep|Mark|New|Pause|Pick|Put|Quick|Redeem|Remove|Rename|Renew|Replace|Restore|Resume|Revoke|Save|Set|Settle|Skip|Spend|Start|Stop|Suppress|Take|Try|Unsuppress|Verify)([A-Z]|$)`)
+var changesByName = regexp.MustCompile(`^(Add|Agent(Add|Draft|Finish|Mark|Note)|Ask|Cancel|Change|Claim|Converse|Create|Decide|Delete|Drop|End|Erase|Finish|Hear|Hold|Import|Invite|Judge|Keep|Mark|New|Pause|Pick|Put|Queue|Quick|Redeem|Remove|Rename|Renew|Replace|Restore|Resume|Revoke|Save|Send|Set|Settle|Skip|Spend|Start|Stop|Suppress|Take|Try|Unsuppress|Verify)([A-Z]|$)`)
 
 // TestEveryChangeGoesInTheHistory calls each of the store's methods every way the
 // isolation fuzzing does, as the organisation that owns the rows, and fails on a call
@@ -83,12 +88,12 @@ func TestEveryChangeGoesInTheHistory(t *testing.T) {
 			lastEvent := latestEvent(s, first.ID)
 			for _, m := range share(methods, i) {
 				untold, changed := tellsTheHistory(t, s, m, first, before, lastEvent)
-				if _, ok := leavesNoHistory[m.Name]; len(untold) > 0 && !ok {
-					t.Errorf("Store.%s changed %s and said nothing in the history: log it, or name it in leavesNoHistory with why", m.Name, strings.Join(untold, ", "))
-				}
+				_, exempt := leavesNoHistory[m.Name]
 				_, listed := untried[m.Name]
 				switch {
-				case !changed && !listed && changesByName.MatchString(m.Name):
+				case len(untold) > 0 && !exempt:
+					t.Errorf("Store.%s changed %s and said nothing in the history: log it, or name it in leavesNoHistory with why", m.Name, strings.Join(untold, ", "))
+				case !changed && !listed && !exempt && changesByName.MatchString(m.Name):
 					t.Errorf("Store.%s changed nothing however it was called, so whether it logs is unknown: give the fuzzing what it needs, or name it in untried with why", m.Name)
 				case changed && listed:
 					t.Errorf("Store.%s is tried now: take it out of untried", m.Name)
@@ -163,6 +168,14 @@ func TestAccessChangesGoInTheHistory(t *testing.T) {
 	do(s.DropBounceHook(o.ID, who))
 	do(s.SaveOrgMail(o.ID, &store.OrgMail{Host: "smtp.alpha.example", Port: 587}, who))
 	do(s.DeleteOrgMail(o.ID, who))
+	u := must(s.CreateUser("bo@alpha.example", "Bo Member", "a long enough password"))
+	do(s.AddMember(o.ID, u.ID, "member", "", who))
+	do(s.SetRole(o.ID, u.ID, "owner", who))
+	do(s.SetRole(o.ID, u.ID, "owner", who))
+	row := must(s.Suppress(o.ID, "ines@larkmoor.example", who))
+	do(s.Unsuppress(o.ID, row.ID, who))
+	c := must(s.AddCampaign(o.ID, marketing.CampaignIn{Name: "Spring news"}, who))
+	do(s.RemoveCampaign(o.ID, c.ID, who))
 
 	var events []store.Event
 	do(s.DB.Where("org_id = ?", o.ID).Order("id").Find(&events).Error)
@@ -173,10 +186,13 @@ func TestAccessChangesGoInTheHistory(t *testing.T) {
 		}
 		got = append(got, e.Action+" "+store.Deref(e.Value))
 	}
-	// Scopes sent again unchanged, a key revoked twice and a domain removed twice say nothing more.
+	// Scopes sent again unchanged, a key revoked twice, a domain removed twice and a role
+	// given twice say nothing more. The do-not-mail list's entries leave its address out.
 	want := []string{"key:new scout: read", "key:scopes scout: read research:write", "key:revoke scout",
-		"enricher:save hunter", "enricher:remove hunter", "domain:add alpha.example", "domain:verify alpha.example",
-		"domain:remove alpha.example", "hook:new ", "hook:remove ", "mail:change smtp.alpha.example", "mail:remove "}
+		"enricher:save hunter", "enricher:remove hunter", "sso:add-domain alpha.example", "sso:verify-domain alpha.example",
+		"sso:remove-domain alpha.example", "webhook:new ", "webhook:remove ", "smtp:change smtp.alpha.example", "smtp:remove ",
+		"member:add bo@alpha.example: member", "member:role bo@alpha.example: owner",
+		"suppression:add ", "suppression:remove added", "campaign:add Spring news", "campaign:remove Spring news"}
 	if !slices.Equal(got, want) {
 		t.Errorf("history:\n got %q\nwant %q", got, want)
 	}

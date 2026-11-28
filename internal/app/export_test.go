@@ -25,7 +25,7 @@ func TestExportPerson(t *testing.T) {
 		}
 	}
 	for _, org := range []*store.Org{o, other} {
-		if _, err := s.Import(org.ID, readFixtures(t)); err != nil {
+		if _, err := s.Import(org.ID, readFixtures(t), "import"); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -50,7 +50,7 @@ func TestExportPerson(t *testing.T) {
 	jar, _ := cookiejar.New(nil)
 	bob := &http.Client{Jar: jar}
 	u := must(s.CreateUser("bob@example.com", "Bob", "correct horse battery"))
-	do(s.AddMember(o.ID, u.ID, "member", u.Name))
+	do(s.AddMember(o.ID, u.ID, "member", u.Name, "Owner One"))
 	res, err := signInWith(bob, srv.URL, "bob@example.com", "correct horse battery")
 	if err != nil || res.StatusCode != http.StatusOK {
 		t.Fatalf("login: %v", err)
