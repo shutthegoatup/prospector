@@ -21,6 +21,8 @@ import (
 
 	"github.com/shutthegoatup/prospector/internal/agents"
 	"github.com/shutthegoatup/prospector/internal/cleantext"
+	"github.com/shutthegoatup/prospector/internal/request"
+	"github.com/shutthegoatup/prospector/internal/research"
 	"github.com/shutthegoatup/prospector/internal/say"
 )
 
@@ -288,12 +290,12 @@ func (a *App) drive(ctx context.Context, run *AgentRun) (string, string) {
 		if err != nil {
 			return a.ended(ctx, run, err)
 		}
-		var task TaskOut
+		var task research.TaskOut
 		_ = json.Unmarshal([]byte(brief), &task)
 		switch {
 		case task.ID == 0:
 			return RunFailed, "the task can't be read"
-		case task.Status == TaskClosed:
+		case task.Status == research.TaskClosed:
 			return RunFinished, "the task was closed"
 		case len(task.Open) == 0:
 			return RunFinished, "every request on the task is done"
@@ -302,7 +304,7 @@ func (a *App) drive(ctx context.Context, run *AgentRun) (string, string) {
 		}
 		run.RequestID = task.Claimed
 		chat := a.converse(cfg, key, run, tools, runInstructions(o, bk),
-			taskPrompt(o, Task{ID: task.ID, Title: task.Title})+"\n\nThis is what get_task returned just now, so you needn't call it first:\n"+brief)
+			research.TaskPrompt(o, Task{ID: task.ID, Title: task.Title})+"\n\nThis is what get_task returned just now, so you needn't call it first:\n"+brief)
 		idle, failures := 0, 0
 		var waitingSince time.Time
 		for turn := 0; turn < episodeTurns; turn++ {
@@ -492,7 +494,7 @@ func runInstructions(o *Org, k *APIKey) string {
 // ownSession talks to the organisation's own MCP server as the built-in key, in
 // memory: the agent gets exactly the tools, descriptions and checks any agent gets.
 func (a *App) ownSession(ctx context.Context, o *Org, k *APIKey) (*mcp.ClientSession, error) {
-	server := a.mcpServer(&Req{Org: o, Key: k})
+	server := a.mcpServer(&request.Req{Org: o, Key: k})
 	clientSide, serverSide := mcp.NewInMemoryTransports()
 	if _, err := server.Connect(ctx, serverSide, nil); err != nil {
 		return nil, err
@@ -569,7 +571,7 @@ var urlPattern = regexp.MustCompile(`https?://[^\s"'<>\[\]{}\\]+`)
 
 func (t *turnState) see(text string) {
 	for _, m := range urlPattern.FindAllString(text, 2000) {
-		if u := normalURL(m); u != "" {
+		if u := research.NormalURL(m); u != "" {
 			t.seen[u] = true
 		}
 	}
@@ -636,7 +638,7 @@ func (t *turnState) call(ctx context.Context, name, rawArgs string) (string, err
 		}
 		// A source the model hasn't been shown is one it made up.
 		for _, src := range sources(name, args) {
-			if !t.seen[normalURL(src)] {
+			if !t.seen[research.NormalURL(src)] {
 				return "", say.Errorf("nothing was stored: %s wasn't on any page a tool showed you in this run. Cite the page you found it on", src)
 			}
 		}
@@ -688,7 +690,7 @@ func (t *turnState) call(ctx context.Context, name, rawArgs string) (string, err
 		if !web && !strings.Contains(strings.ToLower(name), "search") && len(strings.TrimSpace(text)) >= 200 {
 			for _, key := range []string{"url", "uri"} {
 				if u, ok := args[key].(string); ok {
-					if n := normalURL(strings.TrimSpace(u)); n != "" {
+					if n := research.NormalURL(strings.TrimSpace(u)); n != "" {
 						t.seen[n] = true
 					}
 				}

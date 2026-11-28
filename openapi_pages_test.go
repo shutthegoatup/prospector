@@ -72,7 +72,7 @@ func TestAListLeftWholeComesOutAPageAtATime(t *testing.T) {
 	var got []int
 	cursor, pages := "", 0
 	for {
-		page, next, err := listPage(all, 2, cursor)
+		page, next, err := paging.ListPage(all, 2, cursor)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -85,13 +85,13 @@ func TestAListLeftWholeComesOutAPageAtATime(t *testing.T) {
 	if fmt.Sprint(got) != fmt.Sprint(all) || pages != 3 {
 		t.Fatalf("walked %v in %d pages", got, pages)
 	}
-	if page, next, err := listPage(all, 0, ""); err != nil || len(page) != 5 || next != "" {
+	if page, next, err := paging.ListPage(all, 0, ""); err != nil || len(page) != 5 || next != "" {
 		t.Fatalf("a list that fits the usual page: %v %q %v", page, next, err)
 	}
-	if _, _, err := listPage(all, 2, "nonsense"); err != paging.ErrCursor {
+	if _, _, err := paging.ListPage(all, 2, "nonsense"); err != paging.ErrCursor {
 		t.Fatalf("a made-up cursor: %v", err)
 	}
-	if page, next, _ := listPage(all, 2, paging.Cursor(99)); len(page) != 0 || next != "" {
+	if page, next, _ := paging.ListPage(all, 2, paging.Cursor(99)); len(page) != 0 || next != "" {
 		t.Fatalf("a cursor past the end: %v %q", page, next)
 	}
 }

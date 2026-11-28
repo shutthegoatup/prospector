@@ -8,6 +8,8 @@ import (
 
 	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/paging"
+	"github.com/shutthegoatup/prospector/internal/prospecting"
+	"github.com/shutthegoatup/prospector/internal/research"
 )
 
 func TestHistoryKeepsNoPersonalDetails(t *testing.T) {
@@ -35,8 +37,8 @@ func TestHistoryKeepsNoPersonalDetails(t *testing.T) {
 	do(s.Update(o.ID, hannah.ID, "stage", "meeting", "ada"))
 	do(s.Update(o.ID, hannah.ID, "next_date", "2020-02-03", "ada"))
 	do(s.Update(o.ID, hannah.ID, "lost_reason", "went with her agency's tool", "ada"))
-	nia := must(s.QuickAddPerson(o, QuickAdd{Name: "Nia Okafor", Company: deref(hannah.Maker), Linkedin: "https://www.linkedin.com/in/nia-okafor-9z8y7x/", Note: "Hi Nia, saw the relaunch"}, "ada"))
-	must(s.AgentAddContact(o, Actor{Name: "agent:scout", KeyID: 1}, AddContactIn{Company: strconv.FormatInt(*hannah.CompanyID, 10), Name: "Jonas Lindqvist", Title: "CMO", SourceURL: "https://larkmoor.example/team"}))
+	nia := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Nia Okafor", Company: deref(hannah.Maker), Linkedin: "https://www.linkedin.com/in/nia-okafor-9z8y7x/", Note: "Hi Nia, saw the relaunch"}, "ada"))
+	must(s.AgentAddContact(o, Actor{Name: "agent:scout", KeyID: 1}, prospecting.AddContactIn{Company: strconv.FormatInt(*hannah.CompanyID, 10), Name: "Jonas Lindqvist", Title: "CMO", SourceURL: "https://larkmoor.example/team"}))
 
 	var events []Event
 	do(s.InOrg(o.ID).Find(&events).Error)
@@ -76,22 +78,22 @@ func TestAgentsSeeWhatHappenedAtACompany(t *testing.T) {
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	scout, second := Actor{Name: "agent:scout", KeyID: 1}, Actor{Name: "agent:second", KeyID: 2}
-	added, err := s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Larkmoor Yachts",
-		Facts: []FactIn{{Field: "configurator", Value: "Day Cruiser 45 builder", SourceURL: "https://larkmoor.example/build"}}})
+	added, err := s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor Yachts",
+		Facts: []research.FactIn{{Field: "configurator", Value: "Day Cruiser 45 builder", SourceURL: "https://larkmoor.example/build"}}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	hannah, err := s.AgentAddContact(o, scout, AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", SourceURL: "https://larkmoor.example/team"})
+	hannah, err := s.AgentAddContact(o, scout, prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", SourceURL: "https://larkmoor.example/team"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Corvane"}); err != nil {
+	if _, err := s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Corvane"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.PickContact(o.ID, o, hannah.ID, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.AgentMark(o.ID, scout, MarkIn{ContactID: hannah.ID, Step: "linkedin", Date: "2026-11-20", Note: "Ada said she sent it from her phone"}); err != nil {
+	if err := s.AgentMark(o.ID, scout, research.MarkIn{ContactID: hannah.ID, Step: "linkedin", Date: "2026-11-20", Note: "Ada said she sent it from her phone"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Update(o.ID, hannah.ID, "next_step", "Send the brochure", "Ada Lovelace"); err != nil {
@@ -142,7 +144,7 @@ func TestAgentsSeeWhatHappenedAtACompany(t *testing.T) {
 			t.Fatalf("last_agent is about companies: %+v", hit)
 		}
 	}
-	if err := s.SetCompanyStage(o.ID, added.ID, CompanyRejected, "", "Ada Lovelace"); err != nil {
+	if err := s.SetCompanyStage(o.ID, added.ID, prospecting.CompanyRejected, "", "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
 	after := must(s.AgentCompany(o.ID, second, "Larkmoor Yachts", paging.Page{}))
@@ -150,7 +152,7 @@ func TestAgentsSeeWhatHappenedAtACompany(t *testing.T) {
 		t.Fatalf("a person's decision belongs in the history but isn't an agent's visit: %+v", after)
 	}
 	beta := mustOrg(t, s, "beta")
-	if _, err := s.QuickAddPerson(beta, QuickAdd{Linkedin: "https://www.linkedin.com/in/jonas-weber", Name: "Jonas Weber", Company: "Larkmoor Yachts"}, "Grace Hopper"); err != nil {
+	if _, err := s.QuickAddPerson(beta, crm.QuickAdd{Linkedin: "https://www.linkedin.com/in/jonas-weber", Name: "Jonas Weber", Company: "Larkmoor Yachts"}, "Grace Hopper"); err != nil {
 		t.Fatal(err)
 	}
 	if other := must(s.AgentCompany(beta.ID, second, "Larkmoor Yachts", paging.Page{})); other.LastAgent != nil || len(other.History) != 1 {

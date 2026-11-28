@@ -18,13 +18,13 @@ func speaks(lang string) bool {
 // the language r is then in.
 func (a *App) pickLanguage(w http.ResponseWriter, r *http.Request) string {
 	q := r.URL.Query()
-	if !q.Has(langCookie) {
-		return languageOf(r)
+	if !q.Has(request.LangCookie) {
+		return request.LanguageOf(r)
 	}
-	c := &http.Cookie{Name: langCookie, Value: q.Get(langCookie), Path: "/", MaxAge: 365 * 24 * 60 * 60, HttpOnly: true, Secure: a.secure(r), SameSite: http.SameSiteLaxMode}
+	c := &http.Cookie{Name: request.LangCookie, Value: q.Get(request.LangCookie), Path: "/", MaxAge: 365 * 24 * 60 * 60, HttpOnly: true, Secure: a.secure(r), SameSite: http.SameSiteLaxMode}
 	if !request.Locales.Offers(c.Value) {
 		c.Value, c.MaxAge = "", -1
 	}
 	http.SetCookie(w, c)
-	return spoken(r, c.Value, "")
+	return request.Spoken(r, c.Value, "")
 }

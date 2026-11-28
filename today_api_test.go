@@ -8,6 +8,9 @@ import (
 	"time"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/crm"
+	"github.com/shutthegoatup/prospector/internal/identity"
+	"github.com/shutthegoatup/prospector/internal/research"
 )
 
 type todayPage struct {
@@ -47,16 +50,16 @@ func TestTodaysQueueIsInTheAPI(t *testing.T) {
 	if err := s.SaveVoice(o.ID, ada.ID, "Ada Lovelace", "Ada\nAlpha Ltd"); err != nil {
 		t.Fatal(err)
 	}
-	hannah := must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Linkedin: "https://www.linkedin.com/in/hannah-pryce"}, "Ada Lovelace"))
-	tobias := must(s.QuickAddPerson(o, QuickAdd{Name: "Tobias Wren", Company: "Fjordline Saunas"}, "Ada Lovelace"))
+	hannah := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Linkedin: "https://www.linkedin.com/in/hannah-pryce"}, "Ada Lovelace"))
+	tobias := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Tobias Wren", Company: "Fjordline Saunas"}, "Ada Lovelace"))
 	if err := s.Update(o.ID, tobias.ID, "body", "Hi Tobias, a short note about your configurator.", "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
 	added := time.Now().AddDate(0, 0, -10).Format("2006-01-02")
-	if err := s.AgentMark(o.ID, Actor{Name: "agent:scout"}, MarkIn{ContactID: tobias.ID, Step: "linkedin", Date: added}); err != nil {
+	if err := s.AgentMark(o.ID, Actor{Name: "agent:scout"}, research.MarkIn{ContactID: tobias.ID, Step: "linkedin", Date: added}); err != nil {
 		t.Fatal(err)
 	}
-	iris := must(s.QuickAddPerson(o, QuickAdd{Name: "Iris Vane", Company: "Corvane Boats"}, "Ada Lovelace"))
+	iris := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Iris Vane", Company: "Corvane Boats"}, "Ada Lovelace"))
 	if err := s.Update(o.ID, iris.ID, "phone", "+41 44 668 1800", "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
@@ -133,7 +136,7 @@ func TestTodaysQueueIsInTheAPI(t *testing.T) {
 func TestMarkingIsRefusedToWhoeverMayNot(t *testing.T) {
 	t.Parallel()
 	s, o, srv, client := signedIn(t)
-	c := must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts"}, "Ada Lovelace"))
+	c := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts"}, "Ada Lovelace"))
 	marks := srv.URL + "/o/alpha/api/v1/marks"
 	mark := map[string]any{"contact_id": c.ID, "step": "linkedin"}
 
@@ -154,7 +157,7 @@ func TestMarkingIsRefusedToWhoeverMayNot(t *testing.T) {
 	}
 
 	u := mustUser(t, s, o, "grace@example.com", "Grace Hopper", "member")
-	if err := s.SetAreas(o.ID, u.ID, []string{areaSupport}); err != nil {
+	if err := s.SetAreas(o.ID, u.ID, []string{identity.AreaSupport}); err != nil {
 		t.Fatal(err)
 	}
 	grace := signInAs(t, srv, "grace@example.com", "correct horse battery")

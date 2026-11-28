@@ -11,8 +11,13 @@ import (
 	"gorm.io/gorm/logger"
 
 	"github.com/shutthegoatup/prospector/internal/agents"
+	"github.com/shutthegoatup/prospector/internal/crm"
+	"github.com/shutthegoatup/prospector/internal/identity"
+	"github.com/shutthegoatup/prospector/internal/marketing"
 	"github.com/shutthegoatup/prospector/internal/onboarding"
 	"github.com/shutthegoatup/prospector/internal/privacy"
+	"github.com/shutthegoatup/prospector/internal/prospecting"
+	"github.com/shutthegoatup/prospector/internal/research"
 	"github.com/shutthegoatup/prospector/internal/sales"
 	"github.com/shutthegoatup/prospector/internal/signing"
 	"github.com/shutthegoatup/prospector/internal/tickets"
@@ -23,17 +28,17 @@ import (
 // reaches every area.
 type Store struct {
 	*core
-	researchStore
+	research.ResearchStore
 	privacy.PrivacyStore
-	outreachStore
+	marketing.OutreachStore
 	signing.AgreementStore
 	tickets.EnquiryStore
-	prospectingStore
-	crmStore
-	identityStore
+	prospecting.ProspectingStore
+	crm.CRMStore
+	identity.IdentityStore
 	agents.AgentStore
-	ssoStore
-	suppressionStore
+	identity.SsoStore
+	marketing.SuppressionStore
 	onboarding.CustomerStore
 	sales.DealStore
 	sales.SubscriptionStore
@@ -41,16 +46,16 @@ type Store struct {
 }
 
 func newStore(c *core) *Store {
-	s := &Store{core: c, identityStore: identityStore{Core: c}, AgentStore: agents.AgentStore{Core: c}, ssoStore: ssoStore{Core: c},
-		suppressionStore: suppressionStore{Core: c}, CustomerStore: onboarding.CustomerStore{Core: c}, DealStore: sales.DealStore{Core: c},
+	s := &Store{core: c, IdentityStore: identity.IdentityStore{Core: c}, AgentStore: agents.AgentStore{Core: c}, SsoStore: identity.SsoStore{Core: c},
+		SuppressionStore: marketing.SuppressionStore{Core: c}, CustomerStore: onboarding.CustomerStore{Core: c}, DealStore: sales.DealStore{Core: c},
 		SubscriptionStore: sales.SubscriptionStore{Core: c}, OnboardingStore: onboarding.OnboardingStore{Core: c}, PrivacyStore: privacy.PrivacyStore{Core: c}}
 	// An area that needs another's queries holds that area, not the whole store.
-	s.crmStore = crmStore{Core: c, Sales: &s.DealStore}
-	s.prospectingStore = prospectingStore{Core: c, Identity: &s.identityStore, CRM: &s.crmStore}
-	s.EnquiryStore = tickets.EnquiryStore{Core: c, CRM: &s.crmStore}
-	s.AgreementStore = signing.AgreementStore{Core: c, CRM: &s.crmStore, Identity: &s.identityStore}
-	s.outreachStore = outreachStore{Core: c, Identity: &s.identityStore, Suppression: &s.suppressionStore, Billing: &s.SubscriptionStore}
-	s.researchStore = researchStore{Core: c, Prospecting: &s.prospectingStore, CRM: &s.crmStore, Identity: &s.identityStore, Outreach: &s.outreachStore}
+	s.CRMStore = crm.CRMStore{Core: c, Sales: &s.DealStore}
+	s.ProspectingStore = prospecting.ProspectingStore{Core: c, Identity: &s.IdentityStore, CRM: &s.CRMStore}
+	s.EnquiryStore = tickets.EnquiryStore{Core: c, CRM: &s.CRMStore}
+	s.AgreementStore = signing.AgreementStore{Core: c, CRM: &s.CRMStore, Identity: &s.IdentityStore}
+	s.OutreachStore = marketing.OutreachStore{Core: c, Identity: &s.IdentityStore, Suppression: &s.SuppressionStore, Billing: &s.SubscriptionStore}
+	s.ResearchStore = research.ResearchStore{Core: c, Prospecting: &s.ProspectingStore, CRM: &s.CRMStore, Identity: &s.IdentityStore, Outreach: &s.OutreachStore}
 	return s
 }
 

@@ -3,10 +3,12 @@ package main
 import (
 	"testing"
 	"time"
+
+	"github.com/shutthegoatup/prospector/internal/research"
 )
 
-func walkRuns(t *testing.T, s *Store, org int64, limit int) []Run {
-	var all []Run
+func walkRuns(t *testing.T, s *Store, org int64, limit int) []research.Run {
+	var all []research.Run
 	before := time.Time{}
 	for i := 0; i < 50; i++ {
 		runs, _, next := s.Runs(org, before, limit)

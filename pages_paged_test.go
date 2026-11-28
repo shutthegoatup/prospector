@@ -8,13 +8,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/shutthegoatup/prospector/internal/research"
 	"github.com/shutthegoatup/prospector/internal/tickets"
 )
 
 func TestTheTasksPageHasPages(t *testing.T) {
 	t.Parallel()
 	s, o, srv, client := signedIn(t)
-	rows := make([]Task, taskPageSize+2)
+	rows := make([]Task, research.TaskPageSize+2)
 	for i := range rows {
 		rows[i] = Task{OrgID: o.ID, Title: fmt.Sprint("Brief number ", i), CreatedBy: "Nia"}
 	}
@@ -26,23 +27,23 @@ func TestTheTasksPageHasPages(t *testing.T) {
 	}
 	now := time.Now()
 	open, pg, err := s.Tasks(o.ID, false, 1, now)
-	if err != nil || len(open) != taskPageSize || pg.Total != taskPageSize+1 || pg.Pages() != 2 {
+	if err != nil || len(open) != research.TaskPageSize || pg.Total != research.TaskPageSize+1 || pg.Pages() != 2 {
 		t.Fatalf("the first page of open tasks: %d rows, %+v, %v", len(open), pg, err)
 	}
 	// With closed ones shown they come last, on the last page.
 	last, pg, err := s.Tasks(o.ID, true, 2, now)
-	if err != nil || len(last) != 2 || pg.Total != taskPageSize+2 || last[1].ID != rows[0].ID {
+	if err != nil || len(last) != 2 || pg.Total != research.TaskPageSize+2 || last[1].ID != rows[0].ID {
 		t.Fatalf("the last page with closed tasks: %d rows, %+v, %v", len(last), pg, err)
 	}
 
 	// The app walks the same list through the API, with closed tasks still last.
-	pages := apiPages(t, client, srv.URL+"/o/alpha/api/v1/tasks?closed=true&limit="+fmt.Sprint(taskPageSize))
-	if len(pages) != 2 || len(pages[0].Items) != taskPageSize || len(pages[1].Items) != 2 || pages[1].Items[1]["title"] != "Brief number 0" {
+	pages := apiPages(t, client, srv.URL+"/o/alpha/api/v1/tasks?closed=true&limit="+fmt.Sprint(research.TaskPageSize))
+	if len(pages) != 2 || len(pages[0].Items) != research.TaskPageSize || len(pages[1].Items) != 2 || pages[1].Items[1]["title"] != "Brief number 0" {
 		t.Fatalf("the tasks, a page at a time with closed ones: %d pages", len(pages))
 	}
 	// The counts on the chips are of every task, not of the page.
 	var counts struct{ Open, All int }
-	if _, body := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/tasks?limit=1", "", nil); json.Unmarshal([]byte(body), &counts) != nil || counts.Open != taskPageSize+1 || counts.All != taskPageSize+2 {
+	if _, body := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/tasks?limit=1", "", nil); json.Unmarshal([]byte(body), &counts) != nil || counts.Open != research.TaskPageSize+1 || counts.All != research.TaskPageSize+2 {
 		t.Fatalf("the list doesn't count every open task and every task: %+v", counts)
 	}
 }

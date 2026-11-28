@@ -11,6 +11,9 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/shutthegoatup/prospector/internal/marketing"
+	"github.com/shutthegoatup/prospector/internal/prospecting"
+	"github.com/shutthegoatup/prospector/internal/research"
 	"github.com/shutthegoatup/prospector/internal/say"
 )
 
@@ -63,7 +66,7 @@ func (a *App) Enrich(ctx context.Context, o *Org, who Actor, in EnrichIn) ([]Enr
 	if why := o.Settings.Unlookable(c, domain); why != "" {
 		return nil, conflict{Text: say.New(why)}
 	}
-	person := enrichPerson{Name: displayName(c), Domain: domain, Company: co.Name, Linkedin: deref(c.Linkedin)}
+	person := prospecting.EnrichPerson{Name: displayName(c), Domain: domain, Company: co.Name, Linkedin: deref(c.Linkedin)}
 	enrichers, err := s.Enrichers(o.ID)
 	if err != nil {
 		return nil, err
@@ -71,10 +74,10 @@ func (a *App) Enrich(ctx context.Context, o *Org, who Actor, in EnrichIn) ([]Enr
 	var out []EnrichAsked
 	for _, field := range in.Fields {
 		field = strings.ToLower(strings.TrimSpace(field))
-		if !slices.Contains(suggestable, field) {
+		if !slices.Contains(prospecting.Suggestable, field) {
 			return nil, say.Errorf("unknown field %q: email, phone or linkedin", field)
 		}
-		if detailOf(c, field) != "" {
+		if prospecting.DetailOf(c, field) != "" {
 			out = append(out, EnrichAsked{Field: field, Outcome: "has"})
 			continue
 		}
@@ -83,18 +86,18 @@ func (a *App) Enrich(ctx context.Context, o *Org, who Actor, in EnrichIn) ([]Enr
 	return out, nil
 }
 
-func (a *App) enrichField(ctx context.Context, o *Org, who Actor, c Contact, p enrichPerson, enrichers []Enricher, field string) EnrichAsked {
+func (a *App) enrichField(ctx context.Context, o *Org, who Actor, c Contact, p prospecting.EnrichPerson, enrichers []Enricher, field string) EnrichAsked {
 	s := a.s
 	asked := EnrichAsked{Field: field, Outcome: "skipped", Detail: "no vendor here looks for " + field}
 	tried := false
 	for _, e := range enrichers {
-		v := vendors[e.Kind]
+		v := prospecting.Vendors[e.Kind]
 		if v == nil || !slices.Contains(v.Fields(), field) || e.APIKey == "" {
 			continue
 		}
 		if when := s.AskedLately(o.ID, c.ID, field, e.Kind); when != nil {
 			if !tried {
-				asked.Detail = v.Name() + " was asked on " + when.Format("2 Jan 2006") + "; it is asked again after " + fmt.Sprint(enrichAgain.Hours()/24) + " days"
+				asked.Detail = v.Name() + " was asked on " + when.Format("2 Jan 2006") + "; it is asked again after " + fmt.Sprint(prospecting.EnrichAgain.Hours()/24) + " days"
 			}
 			continue
 		}
@@ -124,13 +127,13 @@ func (a *App) enrichField(ctx context.Context, o *Org, who Actor, c Contact, p e
 		value := strings.TrimSpace(found.Value)
 		if value == "" {
 			asked = EnrichAsked{Field: field, Vendor: e.Kind, Outcome: "none"}
-			a.logEnrich(o.ID, who, c, field, e.Kind+": "+lookupNone)
+			a.logEnrich(o.ID, who, c, field, e.Kind+": "+research.LookupNone)
 			continue
 		}
 		kept := a.keepFind(o, who, c, field, e.Kind, value, found.EmailStatus)
 		if kept.Outcome == "skipped" {
 			// Asking again would only spend another lookup on the same answer.
-			a.logEnrich(o.ID, who, c, field, e.Kind+": "+lookupNotKept)
+			a.logEnrich(o.ID, who, c, field, e.Kind+": "+research.LookupNotKept)
 		}
 		return kept
 	}
@@ -160,7 +163,7 @@ func (a *App) keepFind(o *Org, who Actor, c Contact, field, kind, value, status 
 	if field == "phone" && phoneLooksWrong(value) {
 		return EnrichAsked{Field: field, Vendor: kind, Outcome: "skipped", Detail: "it isn't a number that can be called"}
 	}
-	if field == "email" && s.TakesMail(context.Background(), mailDomainOf(value)) == mailRefused {
+	if field == "email" && s.TakesMail(context.Background(), marketing.MailDomainOf(value)) == marketing.MailRefused {
 		return EnrichAsked{Field: field, Vendor: kind, Outcome: "skipped", Detail: "its domain takes no mail"}
 	}
 	made, err := s.KeepFind(o.ID, who, c.ID, field, kind, value, status)

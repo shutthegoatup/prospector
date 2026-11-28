@@ -6,6 +6,10 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/shutthegoatup/prospector/internal/marketing"
+	"github.com/shutthegoatup/prospector/internal/prospecting"
+	"github.com/shutthegoatup/prospector/internal/research"
 )
 
 // fakeDNS answers from tables; a name missing from one is "no such host".
@@ -48,19 +52,19 @@ func TestWhetherADomainTakesMail(t *testing.T) {
 		hosts: map[string][]string{"bare.example": {"192.0.2.1"}},
 		fail:  map[string]bool{"mx flaky.example": true, "host slow.example": true},
 	}
-	for domain, want := range map[string]mailAnswer{
-		"larkmoor.example": mailTaken,
-		"nomail.example":   mailRefused,
-		"bare.example":     mailTaken,
-		"gone.example":     mailRefused,
-		"flaky.example":    mailUnknown,
-		"slow.example":     mailUnknown,
+	for domain, want := range map[string]marketing.MailAnswer{
+		"larkmoor.example": marketing.MailTaken,
+		"nomail.example":   marketing.MailRefused,
+		"bare.example":     marketing.MailTaken,
+		"gone.example":     marketing.MailRefused,
+		"flaky.example":    marketing.MailAnswerUnknown,
+		"slow.example":     marketing.MailAnswerUnknown,
 	} {
-		if got := askDNS(context.Background(), dns, domain); got != want {
+		if got := marketing.AskDNS(context.Background(), dns, domain); got != want {
 			t.Errorf("%s: %v, want %v", domain, got, want)
 		}
 	}
-	if got := mailDomainOf("kai@Bücher.Example."); got != "xn--bcher-kva.example" {
+	if got := marketing.MailDomainOf("kai@Bücher.Example."); got != "xn--bcher-kva.example" {
 		t.Errorf("an international domain is asked about as %q", got)
 	}
 }
@@ -71,9 +75,9 @@ func TestAnAgentsAddressOnADomainThatTakesNoMailIsTurnedAway(t *testing.T) {
 	dns := &fakeDNS{mx: map[string][]*net.MX{"corvane.example": {{Host: "mx.corvane.example."}}},
 		fail: map[string]bool{"mx flaky.example": true}}
 	s.DNS = dns
-	must(s.AgentAddCompany(o.ID, Actor{Name: "agent:scout"}, AddCompanyIn{Name: "Corvane Boats"}))
+	must(s.AgentAddCompany(o.ID, Actor{Name: "agent:scout"}, research.AddCompanyIn{Name: "Corvane Boats"}))
 	add := func(name, email string) error {
-		_, err := s.AgentAddContact(o, Actor{Name: "agent:scout"}, AddContactIn{Company: "Corvane Boats", Name: name,
+		_, err := s.AgentAddContact(o, Actor{Name: "agent:scout"}, prospecting.AddContactIn{Company: "Corvane Boats", Name: name,
 			Email: email, SourceURL: "https://corvane.example/team"})
 		return err
 	}
@@ -103,7 +107,7 @@ func TestAnAgentsAddressOnADomainThatTakesNoMailIsTurnedAway(t *testing.T) {
 	if err := add("Ada Vane", "ada@corvane-boats.example"); err == nil || len(dns.asked) != 0 {
 		t.Errorf("asked DNS again (%v) or let it in (%v)", dns.asked, err)
 	}
-	s.DB.Model(&MailDomain{}).Where("domain = ?", "corvane-boats.example").Update("checked_at", time.Now().Add(-mailRefusedFor-time.Hour))
+	s.DB.Model(&MailDomain{}).Where("domain = ?", "corvane-boats.example").Update("checked_at", time.Now().Add(-marketing.MailRefusedFor-time.Hour))
 	dns.mx["corvane-boats.example"] = []*net.MX{{Host: "mx.corvane-boats.example."}}
 	if err := add("Ada Vane", "ada@corvane-boats.example"); err != nil {
 		t.Errorf("a domain set up since it was last asked about: %v", err)
@@ -174,18 +178,18 @@ func TestACampaignLeavesOutAnAddressWhoseDomainTakesNoMail(t *testing.T) {
 	person(t, s, o, "Hannah Pryce", "Larkmoor Yachts", "hannah@larkmoor.example", true)
 	person(t, s, o, "Sven Dahl", "Nordkap Boats", "sven@nordkap.example", true)
 	s.DB.Create(&MailDomain{Domain: "nordkap.example", CheckedAt: time.Now()})
-	c := must(s.AddCampaign(o.ID, CampaignIn{Name: "Spring price list", Subject: "Our spring prices", Body: "Hello"}, "Ada Lovelace"))
+	c := must(s.AddCampaign(o.ID, marketing.CampaignIn{Name: "Spring price list", Subject: "Our spring prices", Body: "Hello"}, "Ada Lovelace"))
 	got := leftOut(must(s.Audience(o, *c)))
 	if got["Hannah Pryce"] != "" || got["Sven Dahl"] != "its domain takes no mail" {
 		t.Errorf("left out: %+v", got)
 	}
 	// An answer gone stale no longer counts against them, and asking again replaces it.
-	s.DB.Model(&MailDomain{}).Where("domain = ?", "nordkap.example").Update("checked_at", time.Now().Add(-mailRefusedFor-time.Hour))
+	s.DB.Model(&MailDomain{}).Where("domain = ?", "nordkap.example").Update("checked_at", time.Now().Add(-marketing.MailRefusedFor-time.Hour))
 	if got := leftOut(must(s.Audience(o, *c))); got["Sven Dahl"] != "" {
 		t.Errorf("a stale answer left them out: %q", got["Sven Dahl"])
 	}
 	s.DNS = &fakeDNS{mx: map[string][]*net.MX{"nordkap.example": {{Host: "mx.nordkap.example."}}}}
-	if s.TakesMail(context.Background(), "nordkap.example") != mailTaken {
+	if s.TakesMail(context.Background(), "nordkap.example") != marketing.MailTaken {
 		t.Error("asking again didn't find the mail server")
 	}
 	var kept MailDomain

@@ -20,6 +20,7 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"golang.org/x/oauth2"
 
+	"github.com/shutthegoatup/prospector/internal/identity"
 	"github.com/shutthegoatup/prospector/internal/say"
 )
 
@@ -212,7 +213,7 @@ type outsiderClaims struct {
 }
 
 // finish checks the provider's answer to an attempt and swaps its code for who signed in.
-func (p *idp) finish(ctx context.Context, att attempt, answer url.Values) (*outsider, error) {
+func (p *idp) finish(ctx context.Context, att attempt, answer url.Values) (*identity.Outsider, error) {
 	// RFC 9207: a provider that names itself in its answers must, and one naming another is refused.
 	if iss, named := answer["iss"]; (p.namesItself && !named) || (named && iss[0] != p.spec.Issuer && !p.ofTemplate(iss[0])) {
 		return nil, errWrongIssuer
@@ -258,7 +259,7 @@ func (p *idp) finish(ctx context.Context, att attempt, answer url.Values) (*outs
 			return nil, fmt.Errorf("reading who signed in: %w", err)
 		}
 	}
-	who := &outsider{Issuer: id.Issuer, Subject: id.Subject, Email: strings.ToLower(strings.TrimSpace(c.Email)),
+	who := &identity.Outsider{Issuer: id.Issuer, Subject: id.Subject, Email: strings.ToLower(strings.TrimSpace(c.Email)),
 		Name: strings.TrimSpace(c.Name), Username: strings.ToLower(strings.TrimSpace(c.Username)), HostedBy: strings.ToLower(c.HostedBy)}
 	said := c.Verified
 	if p.tenanted != "" {

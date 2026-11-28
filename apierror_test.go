@@ -16,6 +16,9 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"gorm.io/gorm"
+
+	"github.com/shutthegoatup/prospector/internal/identity"
+	"github.com/shutthegoatup/prospector/internal/request"
 )
 
 // An agent is told what it got wrong in the store's words, and nothing of the database's.
@@ -57,7 +60,7 @@ func TestALostRaceForAnAddressReadsAsTaken(t *testing.T) {
 	s := tempStore(t)
 	mustOrg(t, s, "alpha")
 	clash := s.DB.Create(&Org{Slug: "alpha", Name: "Alpha", Color: "#56c5f4"}).Error
-	if !unstorable(clash) {
+	if !identity.Unstorable(clash) {
 		t.Fatalf("the index on an organisation's slug answered: %v", clash)
 	}
 	// The look-up finds /o/beta free, and the index then answers as it just did.
@@ -135,7 +138,7 @@ func TestAnAPIErrorSaysWhoseFaultItIs(t *testing.T) {
 	s, o, srv, _ := signedIn(t)
 	reader, _, _ := s.CreateKey(o.ID, "reader", []string{"read"}, "test")
 	writer, _, _ := s.CreateKey(o.ID, "bot", []string{"read", "research:write"}, "test")
-	ask := func(key, method, path, body string) (*http.Response, problem) {
+	ask := func(key, method, path, body string) (*http.Response, request.Problem) {
 		t.Helper()
 		req, _ := http.NewRequest(method, srv.URL+"/o/alpha/api/v1/"+path, strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
@@ -148,7 +151,7 @@ func TestAnAPIErrorSaysWhoseFaultItIs(t *testing.T) {
 		}
 		defer res.Body.Close()
 		raw, _ := io.ReadAll(res.Body)
-		var p problem
+		var p request.Problem
 		if res.StatusCode >= 400 {
 			if ctype := res.Header.Get("Content-Type"); ctype != "application/problem+json" {
 				t.Fatalf("%s %s: an error came as %q: %s", method, path, ctype, raw)

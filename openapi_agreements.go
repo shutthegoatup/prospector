@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/signing"
 )
@@ -20,11 +21,11 @@ func uploads(f api.StrictHandlerFunc, op string) api.StrictHandlerFunc {
 	}
 	return func(ctx context.Context, w http.ResponseWriter, r *http.Request, in any) (any, error) {
 		if kind, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type")); kind != "application/pdf" {
-			writeProblem(w, r, http.StatusUnsupportedMediaType, say.New("send the document as application/pdf"))
+			request.WriteProblem(w, r, http.StatusUnsupportedMediaType, say.New("send the document as application/pdf"))
 			return nil, nil
 		}
 		if r.ContentLength > signing.AgreementFileLimit {
-			writeProblem(w, r, http.StatusRequestEntityTooLarge, say.Errorf("a document is %d MB at most", signing.AgreementFileLimit>>20))
+			request.WriteProblem(w, r, http.StatusRequestEntityTooLarge, say.Errorf("a document is %d MB at most", signing.AgreementFileLimit>>20))
 			return nil, nil
 		}
 		out, err := f(ctx, w, r, in)

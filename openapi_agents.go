@@ -9,8 +9,10 @@ import (
 
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/crm"
+	"github.com/shutthegoatup/prospector/internal/identity"
 	"github.com/shutthegoatup/prospector/internal/paging"
 	"github.com/shutthegoatup/prospector/internal/request"
+	"github.com/shutthegoatup/prospector/internal/research"
 	"github.com/shutthegoatup/prospector/internal/say"
 )
 
@@ -21,12 +23,12 @@ import (
 var keyless = map[string]bool{"CreateKey": true, "ChangeKey": true, "RevokeKey": true, "CreateOrg": true}
 
 func (s apiServer) GetConnect(ctx context.Context, _ api.GetConnectRequestObject) (api.GetConnectResponseObject, error) {
-	q := reqFrom(ctx)
+	q := request.ReqFrom(ctx)
 	base := s.a.baseURL(ctx.Value(requestKey{}).(*http.Request)) + q.Base()
 	out := api.GetConnect200JSONResponse{BaseUrl: base, McpUrl: base + "mcp", CanKeepKeys: s.a.s.Keyring != nil,
 		Scopes: []api.Scope{}, Tools: []api.AgentToolScope{}, Kinds: []api.AgentKindLabel{}}
 	lang := request.LanguageFrom(ctx)
-	for _, sc := range Scopes {
+	for _, sc := range identity.Scopes {
 		out.Scopes = append(out.Scopes, api.Scope{Name: sc.Name, What: sc.What.In(lang)})
 	}
 	for _, t := range mcpTools {
@@ -44,15 +46,15 @@ func keyOut(k APIKey) api.APIKey {
 }
 
 func (s apiServer) ListKeys(ctx context.Context, in api.ListKeysRequestObject) (api.ListKeysResponseObject, error) {
-	keys, err := s.a.s.Keys(reqFrom(ctx).Org.ID)
+	keys, err := s.a.s.Keys(request.ReqFrom(ctx).Org.ID)
 	if err != nil {
 		return nil, err
 	}
-	keys, next, err := listPage(keys, in.Params.Limit, in.Params.Cursor)
+	keys, next, err := paging.ListPage(keys, in.Params.Limit, in.Params.Cursor)
 	if err != nil {
 		return nil, err
 	}
-	out := api.ListKeys200JSONResponse{Headers: api.ListKeys200ResponseHeaders{Link: nextLink(ctx, next)}}
+	out := api.ListKeys200JSONResponse{Headers: api.ListKeys200ResponseHeaders{Link: request.NextLink(ctx, next)}}
 	out.Body.Items, out.Body.NextCursor = []api.APIKey{}, next
 	for _, k := range keys {
 		out.Body.Items = append(out.Body.Items, keyOut(k))
@@ -77,7 +79,7 @@ func (s apiServer) CreateKey(ctx context.Context, in api.CreateKeyRequestObject)
 	if in.Body == nil {
 		return nil, say.New("send the key's name and scopes")
 	}
-	q := reqFrom(ctx)
+	q := request.ReqFrom(ctx)
 	secret, k, err := s.a.s.CreateKey(q.Org.ID, in.Body.Name, in.Body.Scopes, q.Actor())
 	if err != nil {
 		return nil, err
@@ -89,7 +91,7 @@ func (s apiServer) ChangeKey(ctx context.Context, in api.ChangeKeyRequestObject)
 	if in.Body == nil {
 		return nil, say.New("send the key's scopes")
 	}
-	org := reqFrom(ctx).Org.ID
+	org := request.ReqFrom(ctx).Org.ID
 	if err := s.a.s.SetKeyScopes(org, in.Id, in.Body.Scopes); err != nil {
 		return nil, err
 	}
@@ -101,18 +103,18 @@ func (s apiServer) ChangeKey(ctx context.Context, in api.ChangeKeyRequestObject)
 }
 
 func (s apiServer) RevokeKey(ctx context.Context, in api.RevokeKeyRequestObject) (api.RevokeKeyResponseObject, error) {
-	if err := s.a.s.RevokeKey(reqFrom(ctx).Org.ID, in.Id); err != nil {
+	if err := s.a.s.RevokeKey(request.ReqFrom(ctx).Org.ID, in.Id); err != nil {
 		return nil, err
 	}
 	return api.RevokeKey204Response{}, nil
 }
 
 func (s apiServer) ListAgentScores(ctx context.Context, in api.ListAgentScoresRequestObject) (api.ListAgentScoresResponseObject, error) {
-	scores, next, err := listPage(s.a.s.AgentScores(reqFrom(ctx).Org.ID), in.Params.Limit, in.Params.Cursor)
+	scores, next, err := paging.ListPage(s.a.s.AgentScores(request.ReqFrom(ctx).Org.ID), in.Params.Limit, in.Params.Cursor)
 	if err != nil {
 		return nil, err
 	}
-	out := api.ListAgentScores200JSONResponse{Headers: api.ListAgentScores200ResponseHeaders{Link: nextLink(ctx, next)}}
+	out := api.ListAgentScores200JSONResponse{Headers: api.ListAgentScores200ResponseHeaders{Link: request.NextLink(ctx, next)}}
 	out.Body.Items, out.Body.NextCursor = []api.AgentScore{}, next
 	for _, sc := range scores {
 		out.Body.Items = append(out.Body.Items, api.AgentScore{Agent: sc.Agent, Companies: sc.Companies, Qualified: sc.Qualified, Rejected: sc.Rejected,
@@ -124,7 +126,7 @@ func (s apiServer) ListAgentScores(ctx context.Context, in api.ListAgentScoresRe
 // ListAgentWork pages by time, as the page does: a cursor is the moment the next page's
 // runs ended before.
 func (s apiServer) ListAgentWork(ctx context.Context, in api.ListAgentWorkRequestObject) (api.ListAgentWorkResponseObject, error) {
-	page, err := pageIn(in.Params.Limit, in.Params.Cursor)
+	page, err := paging.PageIn(in.Params.Limit, in.Params.Cursor)
 	if err != nil {
 		return nil, err
 	}
@@ -136,13 +138,13 @@ func (s apiServer) ListAgentWork(ctx context.Context, in api.ListAgentWorkReques
 	if at[0] > 0 {
 		before = time.Unix(0, at[0])
 	}
-	runs, titles, older := s.a.s.Runs(reqFrom(ctx).Org.ID, before, page.Size())
+	runs, titles, older := s.a.s.Runs(request.ReqFrom(ctx).Org.ID, before, page.Size())
 	var next string
 	if !older.IsZero() {
 		next = paging.Cursor(older.UnixNano())
 	}
 	now := time.Now()
-	out := api.ListAgentWork200JSONResponse{Headers: api.ListAgentWork200ResponseHeaders{Link: nextLink(ctx, next)}}
+	out := api.ListAgentWork200JSONResponse{Headers: api.ListAgentWork200ResponseHeaders{Link: request.NextLink(ctx, next)}}
 	out.Body.Items, out.Body.NextCursor = []api.AgentWork{}, next
 	for _, r := range runs {
 		w := api.AgentWork{Actor: r.Actor, Start: r.Start, End: r.End, Going: r.Going(now), Changes: r.Changes, Companies: r.Companies,
@@ -156,7 +158,7 @@ func (s apiServer) ListAgentWork(ctx context.Context, in api.ListAgentWorkReques
 }
 
 func (s apiServer) ListAgentActivity(ctx context.Context, in api.ListAgentActivityRequestObject) (api.ListAgentActivityResponseObject, error) {
-	page, err := pageIn(in.Params.Limit, in.Params.Cursor)
+	page, err := paging.PageIn(in.Params.Limit, in.Params.Cursor)
 	if err != nil {
 		return nil, err
 	}
@@ -164,23 +166,23 @@ func (s apiServer) ListAgentActivity(ctx context.Context, in api.ListAgentActivi
 	if err != nil {
 		return nil, err
 	}
-	events, nextAt, nextID, total := s.a.s.AgentEventsBefore(reqFrom(ctx).Org.ID, at[0], at[1], page.Size())
+	events, nextAt, nextID, total := s.a.s.AgentEventsBefore(request.ReqFrom(ctx).Org.ID, at[0], at[1], page.Size())
 	var next string
 	if nextAt > 0 {
 		next = paging.Cursor(nextAt, nextID)
 	}
-	out := api.ListAgentActivity200JSONResponse{Headers: api.ListAgentActivity200ResponseHeaders{Link: nextLink(ctx, next)}}
+	out := api.ListAgentActivity200JSONResponse{Headers: api.ListAgentActivity200ResponseHeaders{Link: request.NextLink(ctx, next)}}
 	out.Body.Items, out.Body.NextCursor, out.Body.Total = []api.AgentEvent{}, next, total
 	for _, e := range events {
 		out.Body.Items = append(out.Body.Items, api.AgentEvent{At: e.At, Actor: e.Actor, Action: e.Action, Value: e.Value,
-			Text: crm.HistoryText(HistoryItem{Action: e.Action, Value: e.Value}).In(request.LanguageFrom(ctx))})
+			Text: crm.HistoryText(crm.HistoryItem{Action: e.Action, Value: e.Value}).In(request.LanguageFrom(ctx))})
 	}
 	return out, nil
 }
 
 // refuseKeys answers an operation no key may make.
 func refuseKeys(w http.ResponseWriter, r *http.Request) {
-	writeProblem(w, r, http.StatusForbidden, say.New("no key can make, change or revoke a key: an owner does that, signed in"))
+	request.WriteProblem(w, r, http.StatusForbidden, say.New("no key can make, change or revoke a key: an owner does that, signed in"))
 }
 
 var mcpTools = []struct {
@@ -204,7 +206,7 @@ var mcpTools = []struct {
 	{"mark", "outcomes:write", say.New("record an outcome, shown as the agent's with its note")},
 }
 
-func scoreText(sc AgentScore) say.Sayer {
+func scoreText(sc research.AgentScore) say.Sayer {
 	var parts []say.Sayer
 	if sc.Companies > 0 {
 		parts = append(parts, say.Errorf("Companies: %d suggested, %d qualified (%s), %d rejected", sc.Companies, sc.Qualified, percent(sc.Qualified, sc.Companies), sc.Rejected))
@@ -231,7 +233,7 @@ func percent(n, of int) string {
 	return fmt.Sprintf("%d%%", n*100/of)
 }
 
-func runText(r Run, now time.Time) say.Sayer {
+func runText(r research.Run, now time.Time) say.Sayer {
 	span := at(r.Start)
 	if mins := int(r.End.Sub(r.Start).Minutes()); mins > 0 {
 		span = say.Errorf("%s, %d min", span, mins)

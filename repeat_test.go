@@ -3,6 +3,10 @@ package main
 import (
 	"strings"
 	"testing"
+
+	"github.com/shutthegoatup/prospector/internal/crm"
+	"github.com/shutthegoatup/prospector/internal/prospecting"
+	"github.com/shutthegoatup/prospector/internal/research"
 )
 
 func TestRepeatedAgentWorkAddsNothing(t *testing.T) {
@@ -10,13 +14,13 @@ func TestRepeatedAgentWorkAddsNothing(t *testing.T) {
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	scout, second := Actor{Name: "agent:scout", KeyID: 1}, Actor{Name: "agent:second", KeyID: 2}
-	builder := FactIn{Field: "configurator", Value: "Day Cruiser 45 builder", SourceURL: "https://larkmoor.example/build"}
+	builder := research.FactIn{Field: "configurator", Value: "Day Cruiser 45 builder", SourceURL: "https://larkmoor.example/build"}
 
-	first, err := s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Larkmoor Yachts", Domain: "larkmoor.example", Facts: []FactIn{builder}})
+	first, err := s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor Yachts", Domain: "larkmoor.example", Facts: []research.FactIn{builder}})
 	if err != nil || first.Existed {
 		t.Fatalf("add company: %+v %v", first, err)
 	}
-	again, err := s.AgentAddCompany(o.ID, second, AddCompanyIn{Name: "Larkmoor Yachts Ltd", Domain: "https://www.Larkmoor.example/about", Facts: []FactIn{
+	again, err := s.AgentAddCompany(o.ID, second, research.AddCompanyIn{Name: "Larkmoor Yachts Ltd", Domain: "https://www.Larkmoor.example/about", Facts: []research.FactIn{
 		{Field: "Configurator", Value: " day cruiser 45 builder ", SourceURL: builder.SourceURL},
 		{Field: "press", Value: "Boat of the year", SourceURL: "https://larkmoor.example/news"}}})
 	if err != nil || !again.Existed || again.ID != first.ID || again.Name != "Larkmoor Yachts" {
@@ -28,26 +32,26 @@ func TestRepeatedAgentWorkAddsNothing(t *testing.T) {
 	if facts, _ := s.Facts(o.ID, first.ID); len(facts) != 2 {
 		t.Fatalf("a repeated fact was stored again, or a new one dropped: %+v", facts)
 	}
-	repeat, err := s.AgentAddFact(o.ID, second, AddFactIn{Company: "Larkmoor Yachts", FactIn: builder})
+	repeat, err := s.AgentAddFact(o.ID, second, research.AddFactIn{Company: "Larkmoor Yachts", FactIn: builder})
 	if err != nil || !repeat.Existed || repeat.ID == 0 || repeat.Actor != "agent:scout" {
 		t.Fatalf("a repeated fact should come back as the one already there: %+v %v", repeat, err)
 	}
 	elsewhere := builder
 	elsewhere.SourceURL = "https://boats.example/review"
-	if f, err := s.AgentAddFact(o.ID, second, AddFactIn{Company: "Larkmoor Yachts", FactIn: elsewhere}); err != nil || f.Existed {
+	if f, err := s.AgentAddFact(o.ID, second, research.AddFactIn{Company: "Larkmoor Yachts", FactIn: elsewhere}); err != nil || f.Existed {
 		t.Fatalf("the same claim from another page is new evidence: %+v %v", f, err)
 	}
 
-	hannah, err := s.AgentAddContact(o, scout, AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", Title: "Head of Marketing",
+	hannah, err := s.AgentAddContact(o, scout, prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", Title: "Head of Marketing",
 		Linkedin: "https://www.linkedin.com/in/hannah-pryce/", SourceURL: "https://larkmoor.example/team"})
 	if err != nil || hannah.Existed {
 		t.Fatalf("add contact: %+v %v", hannah, err)
 	}
-	jonas, err := s.AgentAddContact(o, scout, AddContactIn{Company: "Larkmoor Yachts", Name: "Jonas Weber", Email: "jonas@larkmoor.example", SourceURL: "https://larkmoor.example/team"})
+	jonas, err := s.AgentAddContact(o, scout, prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "Jonas Weber", Email: "jonas@larkmoor.example", SourceURL: "https://larkmoor.example/team"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	for why, in := range map[string]AddContactIn{
+	for why, in := range map[string]prospecting.AddContactIn{
 		"name":    {Name: "hannah pryce", Title: "CMO"},
 		"profile": {Name: "H. Pryce", Linkedin: "https://uk.linkedin.com/in/hannah-pryce?trk=people"},
 	} {
@@ -57,11 +61,11 @@ func TestRepeatedAgentWorkAddsNothing(t *testing.T) {
 			t.Fatalf("the same person by %s was added again: %+v %v", why, got, err)
 		}
 	}
-	if got, err := s.AgentAddContact(o, second, AddContactIn{Company: "Larkmoor Yachts", Name: "J Weber", Email: "Jonas@Larkmoor.example",
+	if got, err := s.AgentAddContact(o, second, prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "J Weber", Email: "Jonas@Larkmoor.example",
 		SourceURL: "https://larkmoor.example/about"}); err != nil || !got.Existed || got.ID != jonas.ID {
 		t.Fatalf("the same person by address was added again: %+v %v", got, err)
 	}
-	if got, err := s.AgentAddContact(o, second, AddContactIn{Company: "Larkmoor Yachts", Name: "Grace Hopper", SourceURL: "https://larkmoor.example/team"}); err != nil || got.Existed {
+	if got, err := s.AgentAddContact(o, second, prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "Grace Hopper", SourceURL: "https://larkmoor.example/team"}); err != nil || got.Existed {
 		t.Fatalf("someone new was taken for someone known: %+v %v", got, err)
 	}
 	if people, _ := s.People(o.ID, first.ID); len(people) != 3 {
@@ -90,9 +94,9 @@ func TestASharedSiteNamesNoCompany(t *testing.T) {
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	scout := Actor{Name: "agent:scout", KeyID: 1}
-	add := func(name string, facts ...FactIn) *AddCompanyOut {
+	add := func(name string, facts ...research.FactIn) *research.AddCompanyOut {
 		t.Helper()
-		out, err := s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: name, Domain: "brandtech.example", Facts: facts})
+		out, err := s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: name, Domain: "brandtech.example", Facts: facts})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -100,7 +104,7 @@ func TestASharedSiteNamesNoCompany(t *testing.T) {
 	}
 	first := add("Larkmoor Yachts")
 	// A group's second brand on the same site, as an import files it.
-	second, err := s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Corvane"})
+	second, err := s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Corvane"})
 	if err != nil || second.Existed {
 		t.Fatalf("add company: %+v %v", second, err)
 	}
@@ -110,7 +114,7 @@ func TestASharedSiteNamesNoCompany(t *testing.T) {
 	if again := add("larkmoor yachts"); again.ID != first.ID {
 		t.Fatalf("a known name should win over the site: %+v", again)
 	}
-	fact := FactIn{Field: "press", Value: "Österreichs Boot des Jahres", SourceURL: "https://brandtech.example/news"}
+	fact := research.FactIn{Field: "press", Value: "Österreichs Boot des Jahres", SourceURL: "https://brandtech.example/news"}
 	if got := add("corvane", fact); !got.Existed || got.ID != second.ID {
 		t.Fatalf("facts for the second brand went to %+v, not company %d", got, second.ID)
 	}
@@ -119,7 +123,7 @@ func TestASharedSiteNamesNoCompany(t *testing.T) {
 	}
 	shouted := fact
 	shouted.Value = "ÖSTERREICHS BOOT DES JAHRES"
-	if got, err := s.AgentAddFact(o.ID, scout, AddFactIn{Company: "Corvane", FactIn: shouted}); err != nil || !got.Existed {
+	if got, err := s.AgentAddFact(o.ID, scout, research.AddFactIn{Company: "Corvane", FactIn: shouted}); err != nil || !got.Existed {
 		t.Fatalf("the same fact in capitals was stored again: %+v %v", got, err)
 	}
 }
@@ -128,19 +132,19 @@ func TestANoteTypedWhenAddingSomeoneIsTheirs(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	c, err := s.QuickAddPerson(o, QuickAdd{Linkedin: "https://www.linkedin.com/in/hannah-pryce", Name: "Hannah Pryce",
+	c, err := s.QuickAddPerson(o, crm.QuickAdd{Linkedin: "https://www.linkedin.com/in/hannah-pryce", Name: "Hannah Pryce",
 		Company: "Larkmoor Yachts", Note: "Hannah, we met at the boat show."}, "Ada Lovelace")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.AgentDraft(o.ID, Actor{Name: "agent:scout", KeyID: 1}, DraftIn{ContactID: c.ID, Kind: "note", Text: "Hi Hannah."}); err == nil {
+	if err := s.AgentDraft(o.ID, Actor{Name: "agent:scout", KeyID: 1}, research.DraftIn{ContactID: c.ID, Kind: "note", Text: "Hi Hannah."}); err == nil {
 		t.Fatal("an agent replaced the note a person typed when adding them")
 	}
-	templated, err := s.QuickAddPerson(o, QuickAdd{Linkedin: "https://www.linkedin.com/in/jonas-weber", Name: "Jonas Weber", Company: "Larkmoor Yachts"}, "Ada Lovelace")
+	templated, err := s.QuickAddPerson(o, crm.QuickAdd{Linkedin: "https://www.linkedin.com/in/jonas-weber", Name: "Jonas Weber", Company: "Larkmoor Yachts"}, "Ada Lovelace")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.AgentDraft(o.ID, Actor{Name: "agent:scout", KeyID: 1}, DraftIn{ContactID: templated.ID, Kind: "note", Text: "Hi Jonas."}); err != nil {
+	if err := s.AgentDraft(o.ID, Actor{Name: "agent:scout", KeyID: 1}, research.DraftIn{ContactID: templated.ID, Kind: "note", Text: "Hi Jonas."}); err != nil {
 		t.Fatalf("the template note is there to be improved on: %v", err)
 	}
 }
@@ -150,10 +154,10 @@ func TestAgentsLeaveAPersonsWordsAlone(t *testing.T) {
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	scout, second := Actor{Name: "agent:scout", KeyID: 1}, Actor{Name: "agent:second", KeyID: 2}
-	if _, err := s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Larkmoor Yachts"}); err != nil {
+	if _, err := s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor Yachts"}); err != nil {
 		t.Fatal(err)
 	}
-	c, err := s.AgentAddContact(o, scout, AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", SourceURL: "https://larkmoor.example/team"})
+	c, err := s.AgentAddContact(o, scout, prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", SourceURL: "https://larkmoor.example/team"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -166,7 +170,7 @@ func TestAgentsLeaveAPersonsWordsAlone(t *testing.T) {
 		return deref(row.Note)
 	}
 	draft := func(who Actor, kind, text string) error {
-		return s.AgentDraft(o.ID, who, DraftIn{ContactID: c.ID, Kind: kind, Text: text})
+		return s.AgentDraft(o.ID, who, research.DraftIn{ContactID: c.ID, Kind: kind, Text: text})
 	}
 	if err := draft(scout, "note", "Hi Hannah, saw the Day Cruiser builder."); err != nil {
 		t.Fatalf("the template note is there to be improved on: %v", err)

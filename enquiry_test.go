@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/shutthegoatup/prospector/internal/crm"
+	"github.com/shutthegoatup/prospector/internal/research"
 	"github.com/shutthegoatup/prospector/internal/tickets"
 )
 
@@ -162,11 +164,11 @@ func TestEnquiryFindsWhoSentIt(t *testing.T) {
 	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	takeEnquiriesFrom(t, s, o, formSite)
-	known, err := s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Quay Marine", Email: "hannah@quay.example"}, "Ada Lovelace")
+	known, err := s.QuickAddPerson(o, crm.QuickAdd{Name: "Hannah Pryce", Company: "Quay Marine", Email: "hannah@quay.example"}, "Ada Lovelace")
 	if err != nil {
 		t.Fatal(err)
 	}
-	added, err := s.AgentAddCompany(o.ID, Actor{Name: "agent:bot"}, AddCompanyIn{Name: "Reef Boats", Domain: "reef.example"})
+	added, err := s.AgentAddCompany(o.ID, Actor{Name: "agent:bot"}, research.AddCompanyIn{Name: "Reef Boats", Domain: "reef.example"})
 	if err != nil {
 		t.Fatal(err)
 	}

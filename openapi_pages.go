@@ -15,7 +15,7 @@ type requestKey = request.RequestKey
 func listURL(f func(ctx context.Context, w http.ResponseWriter, r *http.Request, in any) (any, error)) func(ctx context.Context, w http.ResponseWriter, r *http.Request, in any) (any, error) {
 	return func(ctx context.Context, w http.ResponseWriter, r *http.Request, in any) (any, error) {
 		ctx = context.WithValue(ctx, requestKey{}, r)
-		return f(context.WithValue(ctx, listURLKey{}, r.URL), w, r, in)
+		return f(context.WithValue(ctx, request.ListURLKey{}, r.URL), w, r, in)
 	}
 }
 

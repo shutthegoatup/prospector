@@ -13,6 +13,7 @@ import (
 	"testing/fstest"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/tickets"
 )
 
@@ -165,7 +166,7 @@ func TestTheNavSaysWhatTheSidebarShows(t *testing.T) {
 	if n.Role != "owner" || !n.Owner || !n.Sales || !n.Support || n.Work != "owner" {
 		t.Errorf("an owner works everything: %+v", n)
 	}
-	want := (&App{s: s}).nav(&Req{Org: o})
+	want := (&App{s: s}).nav(&request.Req{Org: o})
 	if n.Counts.Today != want.Today || n.Counts.Research != want.Research || n.Counts.Conversations != want.Conversations || n.Counts.Enquiries != 1 || n.Counts.Companies != want.Companies || n.Counts.Companies == 0 {
 		t.Errorf("the counts %+v, the sidebar's %+v", n.Counts, want)
 	}

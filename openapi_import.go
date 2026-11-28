@@ -14,7 +14,7 @@ func (s apiServer) AgentImport(ctx context.Context, in api.AgentImportRequestObj
 	if err != nil {
 		return nil, err
 	}
-	total, err := s.a.s.Import(reqFrom(ctx).Org.ID, &p)
+	total, err := s.a.s.Import(request.ReqFrom(ctx).Org.ID, &p)
 	if err != nil {
 		return nil, err
 	}

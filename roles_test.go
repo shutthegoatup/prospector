@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"github.com/shutthegoatup/prospector/internal/research"
 )
 
 func TestChangingSomeonesRole(t *testing.T) {
@@ -81,7 +83,7 @@ func TestChangingAKeysScopes(t *testing.T) {
 	scopes := func(c *http.Client, id int64, to ...string) (int, string) {
 		return call(t, c, "PATCH", base+"api/v1/keys/"+itoa(id), "application/json", map[string]any{"scopes": to})
 	}
-	company := AddCompanyIn{Name: "Fjordline Saunas", Facts: []FactIn{{Field: "configurator", Value: "Kickflip", SourceURL: "https://fjordline.example"}}}
+	company := research.AddCompanyIn{Name: "Fjordline Saunas", Facts: []research.FactIn{{Field: "configurator", Value: "Kickflip", SourceURL: "https://fjordline.example"}}}
 	ctx := context.Background()
 	connect := func() *mcp.ClientSession {
 		session, err := mcp.NewClient(&mcp.Implementation{Name: "test", Version: "1"}, nil).

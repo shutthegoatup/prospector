@@ -8,6 +8,8 @@ import (
 
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/paging"
+	"github.com/shutthegoatup/prospector/internal/prospecting"
+	"github.com/shutthegoatup/prospector/internal/research"
 )
 
 func TestATaskFindsCompaniesForItsOffering(t *testing.T) {
@@ -32,27 +34,27 @@ func TestATaskFindsCompaniesForItsOffering(t *testing.T) {
 
 	// Rejected for the organisation's own offering, which says nothing about this one.
 	scout := Actor{Name: "agent:scout", KeyID: 9}
-	known := must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Harbour Analytics", Domain: "harbour.example"}))
-	if err := s.SetCompanyStage(o.ID, known.ID, CompanyRejected, "", "Ada"); err != nil {
+	known := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Harbour Analytics", Domain: "harbour.example"}))
+	if err := s.SetCompanyStage(o.ID, known.ID, prospecting.CompanyRejected, "", "Ada"); err != nil {
 		t.Fatal(err)
 	}
 
-	added := must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Northwind Payments", Domain: "northwind.example", Task: task.Id}))
-	if added.Stage != CompanyReview {
+	added := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Northwind Payments", Domain: "northwind.example", Task: task.Id}))
+	if added.Stage != prospecting.CompanyReview {
 		t.Fatalf("a company found for an offering should wait in its review: %+v", added)
 	}
-	again := must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Harbour Analytics", Task: task.Id}))
-	if again.Stage != CompanyReview {
+	again := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Harbour Analytics", Task: task.Id}))
+	if again.Stage != prospecting.CompanyReview {
 		t.Fatalf("a company rejected only for the organisation's own should be open for this offering: %+v", again)
 	}
-	if got := companyRow(t, s, o.ID, again.ID).Stage; got != CompanyRejected {
+	if got := companyRow(t, s, o.ID, again.ID).Stage; got != prospecting.CompanyRejected {
 		t.Fatalf("finding it for an offering changed the company's own stage to %s", got)
 	}
 
-	if err := s.JudgeCompany(o.ID, cto.ID, added.ID, CompanyRejected, "", "CTO hired in September", "Ada"); err != nil {
+	if err := s.JudgeCompany(o.ID, cto.ID, added.ID, prospecting.CompanyRejected, "", "CTO hired in September", "Ada"); err != nil {
 		t.Fatal(err)
 	}
-	if out := must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Northwind Payments", Task: task.Id})); out.Stage != CompanyRejected {
+	if out := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Northwind Payments", Task: task.Id})); out.Stage != prospecting.CompanyRejected {
 		t.Fatalf("adding a company rejected for this offering again should say so: %+v", out)
 	}
 
@@ -64,7 +66,7 @@ func TestATaskFindsCompaniesForItsOffering(t *testing.T) {
 	for _, c := range view.Companies {
 		stages[c.Name] = c.Stage
 	}
-	if stages["Northwind Payments"] != CompanyRejected || stages["Harbour Analytics"] != CompanyReview {
+	if stages["Northwind Payments"] != prospecting.CompanyRejected || stages["Harbour Analytics"] != prospecting.CompanyReview {
 		t.Fatalf("a task's companies should stand as they do for its offering: %v", stages)
 	}
 
@@ -108,15 +110,15 @@ func TestWhateverAnAgentWorksOnForAnOfferingWaitsInItsReview(t *testing.T) {
 	task := must(s.CreateTaskFor(o.ID, agencies.ID, "", "Find agencies", "Ada"))
 	scout := Actor{Name: "agent:scout", KeyID: 3}
 	// Known before the task, and reached through a person and a fact rather than add_company.
-	must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Quayside Talent", Domain: "quayside.example"}))
-	must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Fernhill Search", Domain: "fernhill.example"}))
-	must(s.AgentAddContact(o, scout, AddContactIn{Company: "Quayside Talent", Name: "Rhea Moss", Title: "Contract lead",
+	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Quayside Talent", Domain: "quayside.example"}))
+	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Fernhill Search", Domain: "fernhill.example"}))
+	must(s.AgentAddContact(o, scout, prospecting.AddContactIn{Company: "Quayside Talent", Name: "Rhea Moss", Title: "Contract lead",
 		SourceURL: "https://quayside.example/team", Task: task.ID}))
-	must(s.AgentAddFact(o.ID, scout, AddFactIn{Company: "Fernhill Search", Task: task.ID,
-		FactIn: FactIn{Field: "agency_focus", Value: "Contract cloud roles", SourceURL: "https://fernhill.example/practice"}}))
+	must(s.AgentAddFact(o.ID, scout, research.AddFactIn{Company: "Fernhill Search", Task: task.ID,
+		FactIn: research.FactIn{Field: "agency_focus", Value: "Contract cloud roles", SourceURL: "https://fernhill.example/practice"}}))
 
 	waiting := map[string]bool{}
-	for _, v := range must(s.Judged(o.ID, agencies.ID, CompanyReview)) {
+	for _, v := range must(s.Judged(o.ID, agencies.ID, prospecting.CompanyReview)) {
 		waiting[v.Company] = true
 	}
 	if !waiting["Quayside Talent"] || !waiting["Fernhill Search"] {

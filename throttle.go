@@ -4,6 +4,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/shutthegoatup/prospector/internal/identity"
 )
 
 // hashSlots caps how many password hashes run at once, so a burst of sign-in
@@ -130,7 +132,7 @@ const (
 // otherwise be forgotten the day a key is set.
 func newDeviceToken(u *User) string {
 	nonce := randomToken(16)
-	return nonce + "." + deviceMAC(u, nonce)
+	return nonce + "." + identity.DeviceMAC(u, nonce)
 }
 
 func changeBucket(u *User) string { return "change\x00" + u.Email }

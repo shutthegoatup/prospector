@@ -5,6 +5,10 @@ import (
 	"slices"
 	"testing"
 	"time"
+
+	"github.com/shutthegoatup/prospector/internal/crm"
+	"github.com/shutthegoatup/prospector/internal/prospecting"
+	"github.com/shutthegoatup/prospector/internal/research"
 )
 
 // everyContact is one contact per combination of the fields a contact's standing is read from.
@@ -58,7 +62,7 @@ func TestContactStageNames(t *testing.T) {
 		{Contact{Replied: d, Stage: "meeting", Declined: d}, "declined"},
 		{Contact{Status: ContactSuggested, Replied: d, Declined: d}, "suggested"},
 	} {
-		if got := contactStage(tc.c); got != tc.want {
+		if got := research.ContactStage(tc.c); got != tc.want {
 			t.Errorf("contactStage(%+v) = %q, want %q", tc.c, got, tc.want)
 		}
 	}
@@ -74,19 +78,19 @@ func TestPipelineTakesTheFurthestContact(t *testing.T) {
 		want   string
 	}{
 		{"nobody", Company{}, nil, "research"},
-		{"rejected", Company{Stage: CompanyRejected}, nil, "rejected"},
+		{"rejected", Company{Stage: prospecting.CompanyRejected}, nil, "rejected"},
 		{"untouched", Company{}, []Contact{{}}, "research"},
 		{"touched", Company{}, []Contact{{Called: d}}, "outreach"},
-		{"rejected but touched", Company{Stage: CompanyRejected}, []Contact{{Called: d}}, "outreach"},
+		{"rejected but touched", Company{Stage: prospecting.CompanyRejected}, []Contact{{Called: d}}, "outreach"},
 		{"replied", Company{}, []Contact{{Called: d}, {Replied: d}}, "replied"},
 		{"furthest wins", Company{}, []Contact{{Replied: d, Stage: "proposal"}, {Replied: d, Stage: "meeting"}}, "proposal"},
 		{"lost ranks with outreach", Company{}, []Contact{{Replied: d, Stage: "lost"}, {Replied: d}}, "replied"},
 		{"held still counts", Company{}, []Contact{{EmailSent: d, Hold: d}}, "outreach"},
 		{"a reply later declined is no conversation", Company{}, []Contact{{Replied: d, Stage: "meeting", Declined: d}}, "outreach"},
-		{"declined before anyone reached them", Company{Stage: CompanyRejected}, []Contact{{Declined: d}}, "rejected"},
+		{"declined before anyone reached them", Company{Stage: prospecting.CompanyRejected}, []Contact{{Declined: d}}, "rejected"},
 		{"declined beside a live conversation", Company{}, []Contact{{Replied: d, Stage: "proposal", Declined: d}, {Replied: d}}, "replied"},
 	} {
-		if got := pipeline(tc.c, tc.people); got != tc.want {
+		if got := prospecting.Pipeline(tc.c, tc.people); got != tc.want {
 			t.Errorf("%s: pipeline = %q, want %q", tc.name, got, tc.want)
 		}
 	}
@@ -156,7 +160,7 @@ func TestRejectedCompanysPeopleLeaveTheQueues(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	co := Company{OrgID: o.ID, Name: "Larkmoor", Stage: CompanyQualified}
+	co := Company{OrgID: o.ID, Name: "Larkmoor", Stage: prospecting.CompanyQualified}
 	if err := s.DB.Create(&co).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -193,7 +197,7 @@ func TestRejectedCompanysPeopleLeaveTheQueues(t *testing.T) {
 	if before < 5 {
 		t.Fatalf("only %d queue entries before rejecting: the test covers too little", before)
 	}
-	if err := s.SetCompanyStage(o.ID, co.ID, CompanyRejected, "", "ada"); err != nil {
+	if err := s.SetCompanyStage(o.ID, co.ID, prospecting.CompanyRejected, "", "ada"); err != nil {
 		t.Fatal(err)
 	}
 	if n := queued(); n != 0 {
@@ -210,7 +214,7 @@ func TestRejectedCompanysPeopleLeaveTheQueues(t *testing.T) {
 	if names := s.NeverContactCovers(&listed); len(names) != 0 {
 		t.Fatalf("the never-contact list is said to hold back %v, whose company is rejected anyway", names)
 	}
-	if err := s.SetCompanyStage(o.ID, co.ID, CompanyQualified, "", "ada"); err != nil {
+	if err := s.SetCompanyStage(o.ID, co.ID, prospecting.CompanyQualified, "", "ada"); err != nil {
 		t.Fatal(err)
 	}
 	if names := s.NeverContactCovers(&listed); len(names) != 1 {
@@ -281,10 +285,10 @@ func TestMarkDateIsJudgedInLocalTime(t *testing.T) {
 	t.Parallel()
 	east := time.FixedZone("east", 2*60*60)
 	justAfterMidnight := time.Date(2024, 3, 10, 0, 30, 0, 0, east)
-	if err := markDate("2024-03-10", justAfterMidnight); err != nil {
+	if err := crm.MarkDate("2024-03-10", justAfterMidnight); err != nil {
 		t.Fatalf("today was refused just after midnight east of UTC: %v", err)
 	}
-	if err := markDate("2024-03-11", justAfterMidnight); err == nil {
+	if err := crm.MarkDate("2024-03-11", justAfterMidnight); err == nil {
 		t.Fatal("tomorrow was accepted")
 	}
 }
@@ -293,7 +297,7 @@ func TestPickingSomeoneQualifiesTheirCompanyOnTheRecord(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	co := Company{OrgID: o.ID, Name: "Larkmoor", Stage: CompanyReview}
+	co := Company{OrgID: o.ID, Name: "Larkmoor", Stage: prospecting.CompanyReview}
 	if err := s.DB.Create(&co).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -306,14 +310,14 @@ func TestPickingSomeoneQualifiesTheirCompanyOnTheRecord(t *testing.T) {
 	}
 	qualified := func() int64 {
 		var n int64
-		s.InOrg(o.ID).Model(&Event{}).Where("company_id = ? and action = ? and \"user\" = ?", co.ID, "company:"+CompanyQualified, "ada").Count(&n)
+		s.InOrg(o.ID).Model(&Event{}).Where("company_id = ? and action = ? and \"user\" = ?", co.ID, "company:"+prospecting.CompanyQualified, "ada").Count(&n)
 		return n
 	}
 	if err := s.PickContact(o.ID, o, people[0].ID, "ada"); err != nil {
 		t.Fatal(err)
 	}
 	back, err := s.CompanyByID(o.ID, co.ID)
-	if err != nil || back.Stage != CompanyQualified {
+	if err != nil || back.Stage != prospecting.CompanyQualified {
 		t.Fatalf("company stage is %q after a pick (%v)", back.Stage, err)
 	}
 	if qualified() != 1 {

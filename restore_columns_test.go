@@ -9,6 +9,8 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/shutthegoatup/prospector/internal/privacy"
+	"github.com/shutthegoatup/prospector/internal/prospecting"
+	"github.com/shutthegoatup/prospector/internal/research"
 )
 
 // A column added to Contact has to be carried by the snapshot, or be named here as
@@ -34,15 +36,15 @@ func TestASnapshotCarriesEveryContactColumn(t *testing.T) {
 func suggestedAndWorked(t *testing.T, s *Store, o *Org) (suggested, worked int64) {
 	t.Helper()
 	agent := Actor{Name: "agent:scout", KeyID: 1}
-	co := must(s.AgentAddCompany(o.ID, agent, AddCompanyIn{Name: "Larkmoor", Domain: "larkmoor.example"}))
+	co := must(s.AgentAddCompany(o.ID, agent, research.AddCompanyIn{Name: "Larkmoor", Domain: "larkmoor.example"}))
 	add := func(name, email string) int64 {
-		return must(s.AgentAddContact(o, agent, AddContactIn{Company: co.Name, Name: name, Title: "Head of Digital",
+		return must(s.AgentAddContact(o, agent, prospecting.AddContactIn{Company: co.Name, Name: name, Title: "Head of Digital",
 			Email: email, EmailStatus: "guess", SourceURL: "https://larkmoor.example/team"})).ID
 	}
 	suggested, worked = add("Ada Vale", "ada.vale@larkmoor.example"), add("Bram Osei", "bram.osei@larkmoor.example")
 	for _, err := range []error{
 		s.PickContact(o.ID, o, worked, "Nia"),
-		s.AgentDraft(o.ID, agent, DraftIn{ContactID: worked, Kind: "email", Subject: "Hello", Text: "A few words."}),
+		s.AgentDraft(o.ID, agent, research.DraftIn{ContactID: worked, Kind: "email", Subject: "Hello", Text: "A few words."}),
 		s.Mark(o.ID, worked, "replied", "2020-01-02", "Nia"),
 		s.Update(o.ID, worked, "stage", Stages[1].Key, "Nia"),
 		s.Update(o.ID, worked, "next_step", "send the proposal", "Nia"),

@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/prospecting"
+	"github.com/shutthegoatup/prospector/internal/research"
 )
 
 type offeringQueue struct {
@@ -43,9 +45,9 @@ func TestEachOfferingHasAResearchQueueOfItsOwn(t *testing.T) {
 	roles := must(s.AddOffering(o.ID, Offering{Name: "Contract roles", LookFor: "ir35: outside IR35 only"}, "Ada"))
 	task := must(s.CreateTaskFor(o.ID, roles.ID, "", "Find contract roles", "Ada"))
 	scout := Actor{Name: "agent:scout", KeyID: 3}
-	must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Northwind Payments", Domain: "northwind.example", Task: task.ID,
-		Facts: []FactIn{{Field: "ir35", Answer: "yes", Value: "Outside IR35", SourceURL: "https://northwind.example/jobs/1"}}}))
-	must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Larkmoor", Domain: "larkmoor.example"}))
+	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Northwind Payments", Domain: "northwind.example", Task: task.ID,
+		Facts: []research.FactIn{{Field: "ir35", Answer: "yes", Value: "Outside IR35", SourceURL: "https://northwind.example/jobs/1"}}}))
+	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor", Domain: "larkmoor.example"}))
 
 	base := srv.URL + "/o/alpha/api/v1/research"
 	code, own := queueAt(t, base, secret)
@@ -117,7 +119,7 @@ func TestEachOfferingHasAResearchQueueOfItsOwn(t *testing.T) {
 
 	// Suggested by an agent working for the organisation's own, so in its review now too,
 	// and picked from the offering's list for the offering.
-	priya := must(s.AgentAddContact(o, scout, AddContactIn{Company: "Northwind Payments", Name: "Priya Shah", Title: "Head of Platform",
+	priya := must(s.AgentAddContact(o, scout, prospecting.AddContactIn{Company: "Northwind Payments", Name: "Priya Shah", Title: "Head of Platform",
 		SourceURL: "https://northwind.example/team"}))
 	if _, page := queueAt(t, base, secret); researched(page)["Northwind Payments"].Id == 0 {
 		t.Fatalf("work for the organisation's own should bring the company into its review: %+v", page)
@@ -133,14 +135,14 @@ func TestEachOfferingHasAResearchQueueOfItsOwn(t *testing.T) {
 	if _, page := queueAt(t, base+"?offering="+itoa(roles.ID)+"&filter=contact", secret); len(page.Items) != 0 {
 		t.Fatalf("picking someone for the offering should take the company off its contact list: %+v", page)
 	}
-	if got := companyRow(t, s, o.ID, north.Id).Stage; got != CompanyReview {
+	if got := companyRow(t, s, o.ID, north.Id).Stage; got != prospecting.CompanyReview {
 		t.Fatalf("picking for an offering changed the company's own stage to %s", got)
 	}
 	if code, body := asKey(t, "POST", srv.URL+"/o/alpha/api/v1/contacts/"+itoa(priya.ID)+"/pick?offering=0", secret, nil); code != http.StatusConflict {
 		t.Fatalf("picking someone already being reached for one offering for another: %d %s", code, body)
 	}
 
-	if err := s.JudgeCompany(o.ID, roles.ID, north.Id, CompanyRejected, "", "Inside IR35 after all", "Ada"); err != nil {
+	if err := s.JudgeCompany(o.ID, roles.ID, north.Id, prospecting.CompanyRejected, "", "Inside IR35 after all", "Ada"); err != nil {
 		t.Fatal(err)
 	}
 	if _, page := queueAt(t, base+"?offering="+itoa(roles.ID)+"&filter=rejected", secret); len(page.Items) != 1 || page.Items[0].Stage != api.ResearchCompanyStageRejected {
@@ -153,13 +155,13 @@ func TestRemovingAnOfferingBringsWhatItFoundIntoTheOrganisationsOwnReview(t *tes
 	s, o, srv, _ := signedIn(t)
 	cto := must(s.AddOffering(o.ID, Offering{Name: "Interim CTO"}, "Ada"))
 	task := must(s.CreateTaskFor(o.ID, cto.ID, "", "Find scale-ups", "Ada"))
-	must(s.AgentAddCompany(o.ID, Actor{Name: "agent:scout"}, AddCompanyIn{Name: "Harbour Analytics", Task: task.ID}))
-	looked := must(s.AgentAddCompany(o.ID, Actor{Name: "agent:scout"}, AddCompanyIn{Name: "Fernhill Search", Task: task.ID}))
+	must(s.AgentAddCompany(o.ID, Actor{Name: "agent:scout"}, research.AddCompanyIn{Name: "Harbour Analytics", Task: task.ID}))
+	looked := must(s.AgentAddCompany(o.ID, Actor{Name: "agent:scout"}, research.AddCompanyIn{Name: "Fernhill Search", Task: task.ID}))
 	if n := s.ResearchCount(o.ID, "review"); n != 0 {
 		t.Fatalf("found for an offering, in the organisation's own review: %d", n)
 	}
 	// Someone asking to review it for the organisation's own, from the company's page.
-	if err := s.JudgeCompany(o.ID, 0, looked.ID, CompanyReview, "", "", "Ada"); err != nil {
+	if err := s.JudgeCompany(o.ID, 0, looked.ID, prospecting.CompanyReview, "", "", "Ada"); err != nil {
 		t.Fatal(err)
 	}
 	if n := s.ResearchCount(o.ID, "review"); n != 1 {

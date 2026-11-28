@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/identity"
+	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/say"
 )
 
@@ -13,7 +15,7 @@ func orgSummary(o Org) api.OrgSummary {
 }
 
 func (s apiServer) GetNav(ctx context.Context, _ api.GetNavRequestObject) (api.GetNavResponseObject, error) {
-	q := reqFrom(ctx)
+	q := request.ReqFrom(ctx)
 	n := s.a.nav(q)
 	out := api.Nav{Org: orgSummary(*q.Org), Orgs: []api.NavOrg{}, Areas: []api.NavAreas{}, Work: "API key · " + keyName(q)}
 	out.Counts.Today, out.Counts.Research, out.Counts.Conversations = n.Today, n.Research, n.Conversations
@@ -33,12 +35,12 @@ func (s apiServer) GetNav(ctx context.Context, _ api.GetNavRequestObject) (api.G
 	for _, ar := range strings.Fields(q.Member.Areas) {
 		out.Areas = append(out.Areas, api.NavAreas(ar))
 	}
-	out.Sales, out.Support, out.Owner = q.Member.Works(areaSales), q.Member.Works(areaSupport), q.Owner()
+	out.Sales, out.Support, out.Owner = q.Member.Works(identity.AreaSales), q.Member.Works(identity.AreaSupport), q.Owner()
 	out.Work = memberWork(*q.Member)
 	return api.GetNav200JSONResponse(out), nil
 }
 
-func keyName(q *Req) string {
+func keyName(q *request.Req) string {
 	if q.Key == nil {
 		return ""
 	}
@@ -46,9 +48,9 @@ func keyName(q *Req) string {
 }
 
 func (s apiServer) CreateOrg(ctx context.Context, in api.CreateOrgRequestObject) (api.CreateOrgResponseObject, error) {
-	q := reqFrom(ctx)
+	q := request.ReqFrom(ctx)
 	if q.Key != nil || q.User == nil {
-		return nil, refused{Text: say.New("a key belongs to one organisation and can't start another: sign in to do that")}
+		return nil, request.Refused{Text: say.New("a key belongs to one organisation and can't start another: sign in to do that")}
 	}
 	if in.Body == nil {
 		return nil, say.New(`send the organisation's name: {"name": "Acme"}`)
@@ -62,9 +64,9 @@ func (s apiServer) CreateOrg(ctx context.Context, in api.CreateOrgRequestObject)
 
 // newOrgFor starts an organisation owned by whoever is signed in, unless their sign-in
 // came through another organisation's single sign-on, which opens that one alone.
-func newOrgFor(st *Store, q *Req, name string) (*Org, error) {
+func newOrgFor(st *Store, q *request.Req, name string) (*Org, error) {
 	if q.Session != nil && q.Session.Limited {
-		return nil, refused{Text: say.New("you're signed in through one organisation's single sign-on, which opens only that organisation: sign in with a password to start another")}
+		return nil, request.Refused{Text: say.New("you're signed in through one organisation's single sign-on, which opens only that organisation: sign in with a password to start another")}
 	}
 	return st.CreateOrgWithOwner("", name, q.User)
 }

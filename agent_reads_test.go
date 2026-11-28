@@ -9,7 +9,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/paging"
+	"github.com/shutthegoatup/prospector/internal/prospecting"
+	"github.com/shutthegoatup/prospector/internal/research"
 )
 
 // The reads an agent makes with a key: what they answer, how they page, and whom they
@@ -19,7 +22,7 @@ func TestAnAgentsReadsAnswerAsTheyAlwaysHave(t *testing.T) {
 	s, o, srv, client := signedIn(t)
 	other := mustOrg(t, s, "beta")
 	for i, company := range []string{"Larkmoor Yachts", "Larkspur Marine"} {
-		must(s.QuickAddPerson(o, QuickAdd{Name: []string{"Hannah Pryce", "Theo Marsh"}[i], Company: company}, "Ada Lovelace"))
+		must(s.QuickAddPerson(o, crm.QuickAdd{Name: []string{"Hannah Pryce", "Theo Marsh"}[i], Company: company}, "Ada Lovelace"))
 	}
 	lark := must(s.CompanyRef(o.ID, "Larkmoor Yachts"))
 	reader, _, err := s.CreateKey(o.ID, "reader", []string{"read"}, "test")
@@ -66,7 +69,7 @@ func TestAnAgentsReadsAnswerAsTheyAlwaysHave(t *testing.T) {
 
 	for _, ref := range []string{strconv.FormatInt(lark.ID, 10), "Larkmoor%20Yachts"} {
 		res, body = get(reader, "companies/"+ref)
-		var c CompanyDetail
+		var c research.CompanyDetail
 		if res.StatusCode != http.StatusOK || json.Unmarshal([]byte(body), &c) != nil || c.Company.ID != lark.ID {
 			t.Errorf("a company by %s: %d %s", ref, res.StatusCode, body)
 		}
@@ -127,11 +130,11 @@ func TestAnAgentsReadsSayEverythingTheStoreDoes(t *testing.T) {
 	}
 	scout := Actor{Name: "agent:scout", KeyID: k.ID}
 	task := must(s.CreateTask(o.ID, "Yachts", "Yacht builders with a configurator.", "Ada Lovelace"))
-	must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Larkmoor Yachts", Domain: "larkmoor.example", Task: task.ID,
-		Facts: []FactIn{{Field: "configurator", Value: "Day cruiser builder", SourceURL: "https://larkmoor.example/build"}}}))
-	must(s.AgentAddContact(o, scout, AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", Title: "Head of Marketing",
+	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor Yachts", Domain: "larkmoor.example", Task: task.ID,
+		Facts: []research.FactIn{{Field: "configurator", Value: "Day cruiser builder", SourceURL: "https://larkmoor.example/build"}}}))
+	must(s.AgentAddContact(o, scout, prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", Title: "Head of Marketing",
 		SourceURL: "https://larkmoor.example/team", Task: task.ID}))
-	must(s.AgentNote(o.ID, scout, NoteIn{Task: task.ID, Company: "Larkmoor Yachts", Kind: "next", Text: "Look at their dealer list."}))
+	must(s.AgentNote(o.ID, scout, research.NoteIn{Task: task.ID, Company: "Larkmoor Yachts", Kind: "next", Text: "Look at their dealer list."}))
 	lark := must(s.CompanyRef(o.ID, "Larkmoor Yachts"))
 
 	base := srv.URL + "/o/alpha/api/v1/"

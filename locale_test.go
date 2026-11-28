@@ -12,7 +12,7 @@ import (
 
 func TestTheAppSpeaksTheBestOfTheBrowsersLanguagesItHas(t *testing.T) {
 	t.Parallel()
-	set := localeSet{Source: "en-GB", Translated: []string{"de", "fr", "pt"}, Pseudo: []string{"en-XA"}}
+	set := request.LocaleSet{Source: "en-GB", Translated: []string{"de", "fr", "pt"}, Pseudo: []string{"en-XA"}}
 	for _, c := range []struct{ chosen, accept, fallback, want string }{
 		{"", "", "", "en-GB"},
 		{"", "de-CH,de;q=0.9,en;q=0.5", "", "de"},
@@ -122,7 +122,7 @@ func TestAProblemPageIsInTheReadersLanguage(t *testing.T) {
 	_, _, srv, _ := signedIn(t)
 	req, _ := http.NewRequest("GET", srv.URL+"/reset/not-a-token", nil)
 	req.Header.Set("Accept", "text/html")
-	req.AddCookie(&http.Cookie{Name: langCookie, Value: "en-XA"})
+	req.AddCookie(&http.Cookie{Name: request.LangCookie, Value: "en-XA"})
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)

@@ -6,25 +6,28 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/shutthegoatup/prospector/internal/crm"
+	"github.com/shutthegoatup/prospector/internal/identity"
+	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/tickets"
 )
 
 type Nav struct {
-	*Req
+	*request.Req
 	Today, Research, Conversations, Companies int
 	// Enquiries is how many are waiting for an answer from us.
 	Enquiries int
 }
 
 // conversations are the organisation's, read once a request.
-func (a *App) conversations(q *Req) map[string][]Contact {
+func (a *App) conversations(q *request.Req) map[string][]Contact {
 	if q.OpenConversations == nil {
 		q.OpenConversations, _ = a.s.Conversations(q.Org.ID)
 	}
 	return q.OpenConversations
 }
 
-func (a *App) dueByStep(q *Req, now time.Time) map[string][]Contact {
+func (a *App) dueByStep(q *request.Req, now time.Time) map[string][]Contact {
 	if q.DueByStep != nil {
 		return q.DueByStep
 	}
@@ -48,7 +51,7 @@ func (a *App) dueByStep(q *Req, now time.Time) map[string][]Contact {
 	return out
 }
 
-func (a *App) nav(q *Req) Nav {
+func (a *App) nav(q *request.Req) Nav {
 	n := Nav{Req: q}
 	for _, list := range a.dueByStep(q, time.Now()) {
 		n.Today += len(list)
@@ -85,7 +88,7 @@ type TodayData struct {
 	Enquiries int
 	// Steps are the onboarding steps late or due today, ours and the customers alike.
 	Steps int
-	Week  Stats
+	Week  crm.Stats
 }
 
 // todayElsewhere is the work Today points to on other pages, and the last seven days.
@@ -124,7 +127,7 @@ func (a *App) todayElsewhere(org int64, now time.Time, d *TodayData) error {
 
 // bookmarklet sends the LinkedIn profile you're looking at to the add form. It reads only
 // the page's title and headline, on your click.
-func bookmarklet(site string, q *Req, page string) string {
+func bookmarklet(site string, q *request.Req, page string) string {
 	base := site + q.Base() + page + "?popup=1"
 	return `javascript:(()=>{const h=(document.querySelector('.text-body-medium')||{}).innerText||'';` +
 		`window.open('` + base + `&url='+encodeURIComponent(location.href)+'&name='+encodeURIComponent(document.title)+'&headline='+encodeURIComponent(h),'prospect','width=520,height=760')})()`
@@ -149,7 +152,7 @@ type memberIn struct {
 
 // addMember puts someone on the team, making them an account if they have none, and
 // says how they get in.
-func (a *App) addMember(ctx context.Context, q *Req, in memberIn) (string, error) {
+func (a *App) addMember(ctx context.Context, q *request.Req, in memberIn) (string, error) {
 	if in.Role != "owner" && in.Role != "member" {
 		in.Role = "member"
 	}
@@ -172,7 +175,7 @@ func (a *App) addMember(ctx context.Context, q *Req, in memberIn) (string, error
 		if sent {
 			return msg + " They've been emailed a link to choose their password; it lasts 7 days.", nil
 		}
-		if errors.Is(err, errTooSoon) {
+		if errors.Is(err, identity.ErrTooSoon) {
 			msg += " They were emailed a link to choose their password a moment ago, so no other was sent."
 		} else if err != nil {
 			msg += " The invitation couldn't be emailed (" + err.Error() + ")."

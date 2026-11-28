@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/shutthegoatup/prospector/internal/paging"
+	"github.com/shutthegoatup/prospector/internal/prospecting"
+	"github.com/shutthegoatup/prospector/internal/research"
 )
 
 func TestTheListsInsideAnAnswerComeInPages(t *testing.T) {
@@ -14,14 +16,14 @@ func TestTheListsInsideAnAnswerComeInPages(t *testing.T) {
 	s, o, srv, _ := signedIn(t)
 	scout := Actor{Name: "agent:scout", KeyID: 1}
 	task := must(s.CreateTask(o.ID, "", "Find makers of garden rooms", "Nia"))
-	co := must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Larkmoor", Task: task.ID}))
+	co := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor", Task: task.ID}))
 	for i := range 5 {
-		must(s.AgentAddFact(o.ID, scout, AddFactIn{Company: co.Name, Task: task.ID,
-			FactIn: FactIn{Field: "press", Value: fmt.Sprint("Award number ", i), SourceURL: "https://larkmoor.example/news"}}))
-		must(s.AgentAddContact(o, scout, AddContactIn{Company: co.Name, Name: fmt.Sprintf("Quillon V%cle", rune(0x61+i)),
+		must(s.AgentAddFact(o.ID, scout, research.AddFactIn{Company: co.Name, Task: task.ID,
+			FactIn: research.FactIn{Field: "press", Value: fmt.Sprint("Award number ", i), SourceURL: "https://larkmoor.example/news"}}))
+		must(s.AgentAddContact(o, scout, prospecting.AddContactIn{Company: co.Name, Name: fmt.Sprintf("Quillon V%cle", rune(0x61+i)),
 			SourceURL: "https://larkmoor.example/team", Task: task.ID}))
-		must(s.AgentNote(o.ID, scout, NoteIn{Task: task.ID, Company: co.Name, Kind: "next", Text: fmt.Sprint("Note number ", i)}))
-		must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: fmt.Sprint("Fenwick Rooms ", i), Task: task.ID}))
+		must(s.AgentNote(o.ID, scout, research.NoteIn{Task: task.ID, Company: co.Name, Kind: "next", Text: fmt.Sprint("Note number ", i)}))
+		must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: fmt.Sprint("Fenwick Rooms ", i), Task: task.ID}))
 	}
 	once := func(what string, seen map[int64]int, want int) {
 		t.Helper()
@@ -68,7 +70,7 @@ func TestTheListsInsideAnAnswerComeInPages(t *testing.T) {
 	}
 	// Asked for no particular size, the latest history and notes come as they did.
 	usual := must(s.AgentCompany(o.ID, scout, co.Name, paging.Page{}))
-	if len(usual.Facts) != 5 || len(usual.People) != 5 || len(usual.Notes) != agentNotes || usual.NextCursor == "" {
+	if len(usual.Facts) != 5 || len(usual.People) != 5 || len(usual.Notes) != research.AgentNotes || usual.NextCursor == "" {
 		t.Fatalf("a company with no limit asked for: %d facts, %d people, %d notes, next %q", len(usual.Facts), len(usual.People), len(usual.Notes), usual.NextCursor)
 	}
 	if _, err := s.AgentCompany(o.ID, scout, co.Name, paging.Page{Cursor: paging.Cursor(1, 2)}); err != paging.ErrCursor {
@@ -105,7 +107,7 @@ func TestTheListsInsideAnAnswerComeInPages(t *testing.T) {
 		t.Fatalf("a task with six companies, two a page, took %d pages", pages)
 	}
 	// More notes than the task's own page shows can all be reached.
-	extra := make([]TaskNote, taskNotesShown+20)
+	extra := make([]TaskNote, research.TaskNotesShown+20)
 	for i := range extra {
 		extra[i] = TaskNote{OrgID: o.ID, TaskID: task.ID, Actor: "agent:scout", Kind: "next", Text: fmt.Sprint("Later note ", i)}
 	}
@@ -123,14 +125,14 @@ func TestTheListsInsideAnAnswerComeInPages(t *testing.T) {
 		}
 		in.Cursor = got.NextCursor
 	}
-	once("notes on a task with many", left, taskNotesShown+25)
+	once("notes on a task with many", left, research.TaskNotesShown+25)
 	if err := s.DB.Where("task_id = ? and text like ?", task.ID, "Later note%").Delete(&TaskNote{}).Error; err != nil {
 		t.Fatal(err)
 	}
 
 	// Carrying on from a company's short first answer reads full pages.
 	more := must(s.AgentCompany(o.ID, scout, co.Name, paging.Page{Cursor: usual.NextCursor}))
-	if len(more.Notes) != 5-agentNotes || more.NextCursor != "" {
+	if len(more.Notes) != 5-research.AgentNotes || more.NextCursor != "" {
 		t.Fatalf("the rest of a company's notes after its first answer: %d notes, next %q", len(more.Notes), more.NextCursor)
 	}
 

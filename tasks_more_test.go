@@ -6,7 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/paging"
+	"github.com/shutthegoatup/prospector/internal/research"
 )
 
 func TestAKeyThatCanOnlyReadDoesNotPickATaskUp(t *testing.T) {
@@ -20,7 +22,7 @@ func TestAKeyThatCanOnlyReadDoesNotPickATaskUp(t *testing.T) {
 	}
 	var events int64
 	s.InOrg(o.ID).Model(&Event{}).Where(`"user" = ?`, reader.Name).Count(&events)
-	if list := must(firstOf(s.AgentTasks(o.ID, reader, paging.Page{}))); events != 0 || list[0].Status != TaskWaiting {
+	if list := must(firstOf(s.AgentTasks(o.ID, reader, paging.Page{}))); events != 0 || list[0].Status != research.TaskWaiting {
 		t.Fatalf("a key that can add nothing made the task look worked on: %d events, %s", events, list[0].Status)
 	}
 }
@@ -58,7 +60,7 @@ func TestPickingUpATaskIsRecordedOnceARun(t *testing.T) {
 	if err := s.SetTaskClosed(o.ID, task.ID, true, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	if got := must(s.AgentTask(o.ID, Actor{Name: "agent:third", KeyID: 3}, task.ID, paging.Page{})); got.Status != TaskClosed {
+	if got := must(s.AgentTask(o.ID, Actor{Name: "agent:third", KeyID: 3}, task.ID, paging.Page{})); got.Status != research.TaskClosed {
 		t.Fatalf("a closed task can still be read, as closed: %s", got.Status)
 	}
 	if s.InOrg(o.ID).Model(&Event{}).Where("action = ?", "task:pickup").Count(&pickups); pickups != 2 {
@@ -67,7 +69,7 @@ func TestPickingUpATaskIsRecordedOnceARun(t *testing.T) {
 	if err := s.SetTaskClosed(o.ID, task.ID, false, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	if list := must(firstOf(s.AgentTasks(o.ID, scout, paging.Page{}))); len(list) != 1 || list[0].Status != TaskWorking {
+	if list := must(firstOf(s.AgentTasks(o.ID, scout, paging.Page{}))); len(list) != 1 || list[0].Status != research.TaskWorking {
 		t.Fatalf("a reopened task is offered to agents again: %+v", list)
 	}
 }
@@ -77,10 +79,10 @@ func TestACompanyNotedOnATaskCanStillBeFoundForIt(t *testing.T) {
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	scout := Actor{Name: "agent:scout", KeyID: 1}
-	must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Larkmoor Yachts"}))
+	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor Yachts"}))
 	task := must(s.CreateTask(o.ID, "Yachts", "Yacht builders.", "Ada Lovelace"))
-	must(s.AgentNote(o.ID, scout, NoteIn{Task: task.ID, Company: "Larkmoor Yachts", Kind: "skipped", Text: "Looked, unsure."}))
-	must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Larkmoor Yachts", Task: task.ID}))
+	must(s.AgentNote(o.ID, scout, research.NoteIn{Task: task.ID, Company: "Larkmoor Yachts", Kind: "skipped", Text: "Looked, unsure."}))
+	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor Yachts", Task: task.ID}))
 	if found := must(s.AgentTask(o.ID, scout, task.ID, paging.Page{})).Companies; len(found) != 1 {
 		t.Fatalf("a note on the company kept it out of the task's results: %+v", found)
 	}
@@ -92,14 +94,14 @@ func TestErasingSomeoneWithNoCompanyTakesTheirTasksNotes(t *testing.T) {
 	o := mustOrg(t, s, "alpha")
 	scout := Actor{Name: "agent:scout", KeyID: 1}
 	task := must(s.CreateTask(o.ID, "Yachts", "Yacht builders.", "Ada Lovelace"))
-	hannah := must(s.QuickAddPerson(o, QuickAdd{Linkedin: "https://www.linkedin.com/in/hannah-pryce", Name: "Hannah Pryce"}, "Ada Lovelace"))
+	hannah := must(s.QuickAddPerson(o, crm.QuickAdd{Linkedin: "https://www.linkedin.com/in/hannah-pryce", Name: "Hannah Pryce"}, "Ada Lovelace"))
 	if hannah.CompanyID != nil {
 		t.Fatal("this test needs a person filed under no company")
 	}
-	if err := s.AgentDraft(o.ID, scout, DraftIn{ContactID: hannah.ID, Kind: "email", Text: "Hannah, about the builder.", Task: task.ID}); err != nil {
+	if err := s.AgentDraft(o.ID, scout, research.DraftIn{ContactID: hannah.ID, Kind: "email", Text: "Hannah, about the builder.", Task: task.ID}); err != nil {
 		t.Fatal(err)
 	}
-	must(s.AgentNote(o.ID, scout, NoteIn{Task: task.ID, Kind: "next", Text: "Hannah Pryce hasn't answered; try her colleague."}))
+	must(s.AgentNote(o.ID, scout, research.NoteIn{Task: task.ID, Kind: "next", Text: "Hannah Pryce hasn't answered; try her colleague."}))
 	if err := s.ErasePerson(o.ID, hannah.ID, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}

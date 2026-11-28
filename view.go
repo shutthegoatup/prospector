@@ -9,8 +9,10 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/onboarding"
 	"github.com/shutthegoatup/prospector/internal/privacy"
+	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/say"
 )
 
@@ -188,7 +190,7 @@ func badges(c Contact, name string, now time.Time, noMail map[string]bool) []Bad
 	return b
 }
 
-func callScript(c Contact, name string, v Voice) []Line {
+func callScript(c Contact, name string, v request.Voice) []Line {
 	maker := strings.TrimSpace(afterDot.ReplaceAllString(parenthesis.ReplaceAllString(deref(c.Maker), " "), ""))
 	said := ""
 	if parts := strings.Split(deref(c.Note), "\n\n"); len(parts) > 1 {
@@ -215,7 +217,7 @@ func callScript(c Contact, name string, v Voice) []Line {
 		Line{say.New("When they pick up"), say.Errorf("Hi %s, it's %s from %s. Have you got a couple of minutes?", first, v.CallerFirst(), v.Org)},
 		Line{say.New("Why you're calling"), why},
 		// The pitch is the organisation's own.
-		Line{say.New("What you do"), say.New(fill(v.PitchFor(c.OfferingID), first, maker, v.Org))},
+		Line{say.New("What you do"), say.New(crm.Fill(v.PitchFor(c.OfferingID), first, maker, v.Org))},
 		Line{say.New("Ask"), say.Errorf("Who looks after that at %s? Is that you?", maker)},
 		Line{say.New("If they're interested"), say.New("Would 20 minutes next week be worth it?")},
 		Line{say.New("Voicemail"), say.Errorf("Hi %s, it's %s from %s. I sent you a note on LinkedIn. I'll drop you a short email so you've got my details. Thanks, bye.",
@@ -243,7 +245,7 @@ func status(c Contact) string {
 var stateRank = map[string]int{"ok": 0, "warn": 1, "stop": 2}
 
 // MakeCard turns one contact due at one step into what the page shows.
-func MakeCard(step string, raw Contact, v Voice, now time.Time, noMail map[string]bool) Card {
+func MakeCard(step string, raw Contact, v request.Voice, now time.Time, noMail map[string]bool) Card {
 	people := privacy.Alternates(deref(raw.Person))
 	c := forPerson(raw, people)
 	name := displayName(c)
@@ -313,7 +315,7 @@ func todayRank(c Card) int {
 }
 
 // Today merges every step's queue into one list, with counts per step.
-func Today(byStep map[string][]Contact, v Voice, now time.Time, noMail map[string]bool) ([]Card, map[string]int) {
+func Today(byStep map[string][]Contact, v request.Voice, now time.Time, noMail map[string]bool) ([]Card, map[string]int) {
 	var cards []Card
 	counts := map[string]int{}
 	for _, s := range Steps {
@@ -337,7 +339,7 @@ func Today(byStep map[string][]Contact, v Voice, now time.Time, noMail map[strin
 // safeHref lets only web links through, so a stored javascript: link (from an agent
 // or a teammate) can never run when clicked.
 func safeHref(u string) string {
-	if httpURL.MatchString(strings.TrimSpace(u)) {
+	if crm.HttpURL.MatchString(strings.TrimSpace(u)) {
 		return strings.TrimSpace(u)
 	}
 	return "#"

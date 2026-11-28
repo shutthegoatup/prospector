@@ -5,13 +5,16 @@ import (
 
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/privacy"
+	"github.com/shutthegoatup/prospector/internal/prospecting"
+	"github.com/shutthegoatup/prospector/internal/request"
+	"github.com/shutthegoatup/prospector/internal/research"
 	"github.com/shutthegoatup/prospector/internal/sales"
 	"github.com/shutthegoatup/prospector/internal/signing"
 )
 
 // GetCompanyOverview reads what the company page reads, with the same calls.
 func (s apiServer) GetCompanyOverview(ctx context.Context, in api.GetCompanyOverviewRequestObject) (api.GetCompanyOverviewResponseObject, error) {
-	q, st := reqFrom(ctx), s.a.s
+	q, st := request.ReqFrom(ctx), s.a.s
 	org := q.Org.ID
 	c, err := st.CompanyByID(org, in.Id)
 	if err != nil {
@@ -51,19 +54,19 @@ func (s apiServer) GetCompanyOverview(ctx context.Context, in api.GetCompanyOver
 		planned = len(plan)
 	}
 	out := api.CompanyOverview{Id: c.ID, Name: c.Name, Domain: c.Domain, Country: c.Country, Segment: c.Segment, Grade: c.Fit, Why: c.Why,
-		Stage: api.CompanyOverviewStage(c.Stage), FoundFor: c.FoundFor, FoundBy: c.FoundBy, CreatedAt: c.CreatedAt, Pipeline: api.Pipeline(pipeline(*c, people)),
-		Touches: touches, LookingFor: criteriaOut(assetsFound(q.Org.Settings, facts)), Facts: []api.ResearchFact{}, People: []api.CompanyPerson{},
+		Stage: api.CompanyOverviewStage(c.Stage), FoundFor: c.FoundFor, FoundBy: c.FoundBy, CreatedAt: c.CreatedAt, Pipeline: api.Pipeline(prospecting.Pipeline(*c, people)),
+		Touches: touches, LookingFor: criteriaOut(prospecting.AssetsFound(q.Org.Settings, facts)), Facts: []api.ResearchFact{}, People: []api.CompanyPerson{},
 		Onboardings: onboardings, PlannedSteps: planned, Subscriptions: []api.Subscription{}, Agreements: []api.Agreement{}}
 	for _, f := range facts {
 		out.Facts = append(out.Facts, factOut(f))
 	}
 	for _, p := range people {
-		person := api.CompanyPerson{Id: p.ID, Name: displayName(p), Title: p.Title, Linkedin: deref(p.Linkedin), Stage: contactStage(p), Pending: []api.PendingDetail{}}
+		person := api.CompanyPerson{Id: p.ID, Name: displayName(p), Title: p.Title, Linkedin: deref(p.Linkedin), Stage: research.ContactStage(p), Pending: []api.PendingDetail{}}
 		if len(privacy.Alternates(deref(p.Person))) > 1 {
 			person.Several = deref(p.Person)
 		}
 		for _, d := range pending[p.ID] {
-			person.Pending = append(person.Pending, pendingOut(d))
+			person.Pending = append(person.Pending, research.PendingOut(d))
 		}
 		out.People = append(out.People, person)
 	}
@@ -77,10 +80,10 @@ func (s apiServer) GetCompanyOverview(ctx context.Context, in api.GetCompanyOver
 }
 
 func factOut(f Fact) api.ResearchFact {
-	return api.ResearchFact{Id: f.ID, Field: f.Field, Value: f.Value, SourceUrl: f.SourceURL, Answer: factAnswerOut(f.Answer), Inferred: f.Inferred, By: f.Actor, At: f.CreatedAt}
+	return api.ResearchFact{Id: f.ID, Field: f.Field, Value: f.Value, SourceUrl: f.SourceURL, Answer: research.FactAnswerOut(f.Answer), Inferred: f.Inferred, By: f.Actor, At: f.CreatedAt}
 }
 
-func criteriaOut(found []AssetFound) []api.Criterion {
+func criteriaOut(found []prospecting.AssetFound) []api.Criterion {
 	out := []api.Criterion{}
 	for _, a := range found {
 		cr := api.Criterion{Field: a.Field, Must: a.Must, State: api.CriterionState(a.State)}

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/onboarding"
 )
 
@@ -333,7 +334,7 @@ func TestARobotWorksOnboardingAsItsScopesAllow(t *testing.T) {
 		return secret
 	}
 	reader, writer, inviter, stranger := key(o.ID, "read"), key(o.ID, "read", "customers:write"), key(o.ID, "customers:invite"), key(other.ID, "read", "customers:write", "customers:invite")
-	hannah := must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
+	hannah := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
 	base := srv.URL + "/o/alpha/api/v1/"
 	start := map[string]any{"company": *hannah.CompanyID, "name": "Leith site", "start": "2020-01-06"}
 

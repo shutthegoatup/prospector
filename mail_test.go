@@ -15,7 +15,9 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/shutthegoatup/prospector/internal/identity"
 	"github.com/shutthegoatup/prospector/internal/mailer"
+	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/say"
 )
 
@@ -151,7 +153,7 @@ func TestAResetIsMailedInTheLanguageItWasAskedIn(t *testing.T) {
 	_, srv, _, box := mailSite(t, nil)
 	req, _ := http.NewRequest("POST", srv.URL+"/api/v1/password-resets", strings.NewReader(`{"email": "ada@example.com"}`))
 	req.Header.Set("content-type", "application/json")
-	req.AddCookie(&http.Cookie{Name: langCookie, Value: "en-XA"})
+	req.AddCookie(&http.Cookie{Name: request.LangCookie, Value: "en-XA"})
 	res, err := http.DefaultClient.Do(req)
 	if err != nil || res.StatusCode != http.StatusAccepted {
 		t.Fatalf("asking for a link: %v %v", res, err)
@@ -270,7 +272,7 @@ func TestResetLinksEnd(t *testing.T) {
 	if err := s.SetPassword("ada@example.com", "set from the command line"); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.RedeemPasswordToken(live, "whatever comes next"); !errors.Is(err, errBadLink) {
+	if err := s.RedeemPasswordToken(live, "whatever comes next"); !errors.Is(err, identity.ErrBadLink) {
 		t.Errorf("a link from before the password changed: %v", err)
 	}
 }
@@ -353,7 +355,7 @@ func TestInvitationByEmail(t *testing.T) {
 		t.Fatalf("adding Alan again at once: %d %s", code, body)
 	}
 	box.take(t, 0)
-	if err := s.DB.Model(&PasswordToken{}).Where("user_id = ?", alan.ID).Update("created_at", time.Now().Add(-2*resetGap)).Error; err != nil {
+	if err := s.DB.Model(&PasswordToken{}).Where("user_id = ?", alan.ID).Update("created_at", time.Now().Add(-2*identity.ResetGap)).Error; err != nil {
 		t.Fatal(err)
 	}
 	code, body = call(t, ada, "POST", srv.URL+"/o/alpha/api/v1/members", "application/json", map[string]string{"email": "alan@example.com"})
@@ -368,7 +370,7 @@ func TestInvitationByEmail(t *testing.T) {
 	}
 
 	// Arriving through a provider ends the invitation with the first password.
-	if err := s.DB.Transaction(func(tx *gorm.DB) error { return claim(tx, alan) }); err != nil {
+	if err := s.DB.Transaction(func(tx *gorm.DB) error { return identity.Claim(tx, alan) }); err != nil {
 		t.Fatal(err)
 	}
 	var left int64
@@ -504,7 +506,7 @@ func TestAnotherOrganisationsMailServerNeverCarriesAnExistingAccountsLink(t *tes
 	}
 	box.take(t, 1)
 	grace := must(s.UserByEmail("grace@example.com"))
-	if err := s.DB.Model(&PasswordToken{}).Where("user_id = ?", grace.ID).Update("created_at", time.Now().Add(-2*resetGap)).Error; err != nil {
+	if err := s.DB.Model(&PasswordToken{}).Where("user_id = ?", grace.ID).Update("created_at", time.Now().Add(-2*identity.ResetGap)).Error; err != nil {
 		t.Fatal(err)
 	}
 

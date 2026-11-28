@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/shutthegoatup/prospector/internal/paging"
+	"github.com/shutthegoatup/prospector/internal/prospecting"
+	"github.com/shutthegoatup/prospector/internal/research"
 )
 
 // The task reads moved into the spec answer exactly what the store says, which is what
@@ -27,11 +29,11 @@ func TestTheSpecsTaskReadsSayEverythingTheStoreDoes(t *testing.T) {
 	otherKey, _ := key("other")
 
 	task := must(s.CreateTask(o.ID, "Yachts", "Yacht builders with a configurator.", "Ada Lovelace"))
-	must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Larkmoor Yachts", Task: task.ID,
-		Facts: []FactIn{{Field: "configurator", Value: "Day cruiser builder", SourceURL: "https://larkmoor.example/build"}}}))
-	must(s.AgentAddContact(o, scout, AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", Title: "Head of Marketing",
+	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor Yachts", Task: task.ID,
+		Facts: []research.FactIn{{Field: "configurator", Value: "Day cruiser builder", SourceURL: "https://larkmoor.example/build"}}}))
+	must(s.AgentAddContact(o, scout, prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", Title: "Head of Marketing",
 		SourceURL: "https://larkmoor.example/team", Task: task.ID}))
-	must(s.AgentNote(o.ID, scout, NoteIn{Task: task.ID, Company: "Larkmoor Yachts", Kind: "next", Text: "Look at their dealer list."}))
+	must(s.AgentNote(o.ID, scout, research.NoteIn{Task: task.ID, Company: "Larkmoor Yachts", Kind: "next", Text: "Look at their dealer list."}))
 	must(s.AskTask(o.ID, task.ID, "Now some in Dorset.", "Ada Lovelace"))
 	finished := must(s.AskTask(o.ID, task.ID, "And one in Kent.", "Ada Lovelace"))
 	if err := s.SetRequestDone(o.ID, finished.ID, true, "Ada Lovelace"); err != nil {

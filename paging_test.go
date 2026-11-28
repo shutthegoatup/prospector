@@ -7,7 +7,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/paging"
+	"github.com/shutthegoatup/prospector/internal/request"
+	"github.com/shutthegoatup/prospector/internal/research"
 )
 
 // firstOf drops the middle of three results, for must.
@@ -41,12 +44,14 @@ func TestEveryListAnAgentReadsComesInPages(t *testing.T) {
 	s, o, srv, _ := signedIn(t)
 	scout := Actor{Name: "agent:scout", KeyID: 1}
 	for i := range 5 {
-		co := must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: fmt.Sprintf("Larkmoor Rooms %d", i)}))
-		must(s.QuickAddPerson(o, QuickAdd{Name: fmt.Sprintf("Quillon V%cle", rune(0x61+i)), Company: co.Name}, "Nia"))
+		co := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: fmt.Sprintf("Larkmoor Rooms %d", i)}))
+		must(s.QuickAddPerson(o, crm.QuickAdd{Name: fmt.Sprintf("Quillon V%cle", rune(0x61+i)), Company: co.Name}, "Nia"))
 		must(s.CreateTask(o.ID, "", fmt.Sprint("Find makers of garden rooms, part ", i), "Nia"))
 	}
 
-	hits, pages := walk(t, 2, func(in paging.Page) ([]SearchHit, string, error) { return s.AgentSearch(o.ID, scout, "larkmoor", in) })
+	hits, pages := walk(t, 2, func(in paging.Page) ([]research.SearchHit, string, error) {
+		return s.AgentSearch(o.ID, scout, "larkmoor", in)
+	})
 	seen := map[string]int{}
 	for _, h := range hits {
 		seen[fmt.Sprint(h.Kind, h.ID)]++
@@ -61,7 +66,7 @@ func TestEveryListAnAgentReadsComesInPages(t *testing.T) {
 		t.Fatalf("a made-up cursor: %v", err)
 	}
 
-	tasks, pages := walk(t, 2, func(in paging.Page) ([]TaskBrief, string, error) { return s.AgentTasks(o.ID, scout, in) })
+	tasks, pages := walk(t, 2, func(in paging.Page) ([]research.TaskBrief, string, error) { return s.AgentTasks(o.ID, scout, in) })
 	if len(tasks) != 5 || pages != 3 {
 		t.Fatalf("5 tasks two a page: %d in %d pages", len(tasks), pages)
 	}
@@ -81,7 +86,7 @@ func TestEveryListAnAgentReadsComesInPages(t *testing.T) {
 		t.Fatalf("the page after a task was opened: %+v %v", second, err)
 	}
 
-	due, pages := walk(t, 2, func(in paging.Page) ([]DueItem, string, error) {
+	due, pages := walk(t, 2, func(in paging.Page) ([]research.DueItem, string, error) {
 		out, err := s.AgentDue(o, in)
 		if err != nil {
 			return nil, "", err
@@ -143,7 +148,7 @@ func TestEveryListAnAgentReadsComesInPages(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		var p problem
+		var p request.Problem
 		json.NewDecoder(res.Body).Decode(&p)
 		res.Body.Close()
 		if res.StatusCode != http.StatusBadRequest || !strings.Contains(p.Detail, says) {

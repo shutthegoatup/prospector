@@ -3,6 +3,8 @@ package main
 import (
 	"strings"
 	"testing"
+
+	"github.com/shutthegoatup/prospector/internal/crm"
 )
 
 func TestRestoreKeepsHistoryWithItsPerson(t *testing.T) {
@@ -23,7 +25,7 @@ func TestRestoreKeepsHistoryWithItsPerson(t *testing.T) {
 	do(s.Update(o.ID, jonas.ID, "tz", "Europe/Berlin", "ada"))
 	before := must(s.SnapshotText(o.ID))
 
-	nia := must(s.QuickAddPerson(o, QuickAdd{Name: "Nia Okafor", Company: deref(hannah.Maker), Email: "nia.okafor@larkmoor.example"}, "ada"))
+	nia := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Nia Okafor", Company: deref(hannah.Maker), Email: "nia.okafor@larkmoor.example"}, "ada"))
 	do(s.Update(o.ID, nia.ID, "call_notes", "asked for a callback in spring", "ada"))
 	do(s.Mark(o.ID, nia.ID, "replied", "2020-01-02", "ada"))
 	do(s.DB.Create(&Fact{OrgID: o.ID, CompanyID: *nia.CompanyID, ContactID: &nia.ID, Field: "role", Value: "Head of Digital", SourceURL: "https://larkmoor.example/team"}).Error)

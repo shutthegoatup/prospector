@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/identity"
+	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/say"
 )
 
@@ -15,20 +17,20 @@ import (
 func (a *App) accountCaller(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if hasKey(r) {
-			writeProblem(w, r, http.StatusForbidden, say.New("a key can't sign in, sign out or change a password: a person does that in a browser"))
+			request.WriteProblem(w, r, http.StatusForbidden, say.New("a key can't sign in, sign out or change a password: a person does that in a browser"))
 			return
 		}
 		// Anyone may send these, so none is let run to more than an address and a password need.
 		r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
 		sess, u := a.session(r)
-		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), reqKey{}, &Req{User: u, Session: sess})))
+		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), request.ReqKey{}, &request.Req{User: u, Session: sess})))
 	})
 }
 
 var errSignedOut = typed{http.StatusUnauthorized, api.ProblemTypeSignedOut, say.New("signed out"), 0}
 
-func signedInFrom(ctx context.Context) (*Req, error) {
-	q := reqFrom(ctx)
+func signedInFrom(ctx context.Context) (*request.Req, error) {
+	q := request.ReqFrom(ctx)
 	if q.User == nil {
 		return nil, errSignedOut
 	}
@@ -90,8 +92,8 @@ func (s apiServer) SignIn(ctx context.Context, in api.SignInRequestObject) (api.
 	switch {
 	case wait > 0:
 		return nil, throttledFor(wait)
-	case errors.Is(err, errWrongLogin):
-		return nil, typed{http.StatusUnauthorized, api.ProblemTypeWrongLogin, errWrongLogin, 0}
+	case errors.Is(err, identity.ErrWrongLogin):
+		return nil, typed{http.StatusUnauthorized, api.ProblemTypeWrongLogin, identity.ErrWrongLogin, 0}
 	case err != nil:
 		return nil, err
 	}
@@ -190,12 +192,12 @@ func (s apiServer) RequestPasswordReset(ctx context.Context, in api.RequestPassw
 	if in.Body == nil {
 		return nil, say.New(`send {"email": "…"}`)
 	}
-	email, lang := in.Body.Email, languageOf(requestFrom(ctx))
+	email, lang := in.Body.Email, request.LanguageOf(requestFrom(ctx))
 	s.a.background(func() { s.a.sendReset(email, lang) })
 	return api.RequestPasswordReset202Response{}, nil
 }
 
-var errLinkUsed = typed{http.StatusGone, api.ProblemTypeLinkUsed, errBadLink, 0}
+var errLinkUsed = typed{http.StatusGone, api.ProblemTypeLinkUsed, identity.ErrBadLink, 0}
 
 func (s apiServer) GetPasswordReset(_ context.Context, in api.GetPasswordResetRequestObject) (api.GetPasswordResetResponseObject, error) {
 	u, err := s.a.s.PasswordTokenUser(in.Token)
@@ -216,7 +218,7 @@ func (s apiServer) ResetPassword(ctx context.Context, in api.ResetPasswordReques
 		return nil, ctx.Err()
 	}
 	err := s.a.s.RedeemPasswordToken(in.Token, in.Body.Password)
-	if errors.Is(err, errBadLink) {
+	if errors.Is(err, identity.ErrBadLink) {
 		return nil, errLinkUsed
 	}
 	if err != nil {

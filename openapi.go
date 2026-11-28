@@ -12,9 +12,12 @@ import (
 
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/crm"
+	"github.com/shutthegoatup/prospector/internal/marketing"
 	"github.com/shutthegoatup/prospector/internal/onboarding"
+	"github.com/shutthegoatup/prospector/internal/paging"
 	"github.com/shutthegoatup/prospector/internal/privacy"
 	"github.com/shutthegoatup/prospector/internal/request"
+	"github.com/shutthegoatup/prospector/internal/research"
 	"github.com/shutthegoatup/prospector/internal/sales"
 	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/signing"
@@ -31,24 +34,24 @@ type apiServer struct {
 	sales.SalesAPI
 	tickets.TicketsAPI
 	onboarding.OnboardingAPI
-	marketingAPI
+	marketing.MarketingAPI
 	crm.CRMAPI
 	privacy.PrivacyAPI
-	researchAPI
+	research.ResearchAPI
 }
 
 // newAPIServer hands each product's operations the part of the store they use.
 func newAPIServer(a *App) apiServer {
 	return apiServer{a: a,
-		researchAPI:   researchAPI{Research: &a.s.researchStore, Finding: &a.s.prospectingStore, Records: &a.s.crmStore, Runs: a},
+		ResearchAPI:   research.ResearchAPI{Research: &a.s.ResearchStore, Finding: &a.s.ProspectingStore, Records: &a.s.CRMStore, Runs: a},
 		PrivacyAPI:    privacy.PrivacyAPI{Store: &a.s.PrivacyStore},
-		CRMAPI:        crm.CRMAPI{Records: &a.s.crmStore},
+		CRMAPI:        crm.CRMAPI{Records: &a.s.CRMStore},
 		SigningAPI:    signing.SigningAPI{Store: &a.s.AgreementStore},
 		TicketsAPI:    tickets.TicketsAPI{Enquiries: &a.s.EnquiryStore, Mail: a},
 		OnboardingAPI: onboarding.OnboardingAPI{Steps: &a.s.OnboardingStore, Customers: &a.s.CustomerStore, App: a},
-		marketingAPI:  marketingAPI{Campaigns: &a.s.outreachStore, Suppression: &a.s.suppressionStore, App: a},
+		MarketingAPI:  marketing.MarketingAPI{Campaigns: &a.s.OutreachStore, Suppression: &a.s.SuppressionStore, App: a},
 		SalesAPI: sales.SalesAPI{Pipeline: &a.s.DealStore, Subscriptions: &a.s.SubscriptionStore,
-			People: &a.s.crmStore, Onboarding: &a.s.OnboardingStore},
+			People: &a.s.CRMStore, Onboarding: &a.s.OnboardingStore},
 	}
 }
 
@@ -88,10 +91,10 @@ func (a *App) routeAPI(mux *http.ServeMux) {
 		RequestErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			// The agents' operations say it as the routes they came from did.
 			if keysOnly[r.Pattern] {
-				writeProblem(w, r, http.StatusBadRequest, say.Errorf("bad request body: %s", err.Error()))
+				request.WriteProblem(w, r, http.StatusBadRequest, say.Errorf("bad request body: %s", err.Error()))
 				return
 			}
-			writeProblem(w, r, http.StatusBadRequest, say.New(err.Error()))
+			request.WriteProblem(w, r, http.StatusBadRequest, say.New(err.Error()))
 		},
 		ResponseErrorHandlerFunc: apiFail,
 	})
@@ -103,7 +106,7 @@ func (a *App) routeAPI(mux *http.ServeMux) {
 		BaseRouter:  router,
 		Middlewares: []api.MiddlewareFunc{a.apiCaller(account, keysOnly), noEmptyLink},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-			writeProblem(w, r, http.StatusBadRequest, say.New(err.Error()))
+			request.WriteProblem(w, r, http.StatusBadRequest, say.New(err.Error()))
 		},
 	})
 }
@@ -139,7 +142,7 @@ func (a *App) apiCaller(account, keysOnly map[string]bool) api.MiddlewareFunc {
 func (a *App) caller(account, keysOnly map[string]bool, next http.Handler) http.Handler {
 	member := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if hasKey(r) && r.PathValue("org") == "" {
-			writeProblem(w, r, http.StatusForbidden, say.New("a key belongs to one organisation and can't start another: sign in to do that"))
+			request.WriteProblem(w, r, http.StatusForbidden, say.New("a key belongs to one organisation and can't start another: sign in to do that"))
 			return
 		}
 		if hasKey(r) || keysOnly[r.Pattern] {
@@ -152,7 +155,7 @@ func (a *App) caller(account, keysOnly map[string]bool, next http.Handler) http.
 		}
 		if _, u := a.session(r); u == nil {
 			w.Header().Set("WWW-Authenticate", `Bearer realm="prospector"`)
-			writeTyped(w, r, http.StatusUnauthorized, api.ProblemTypeSignedOut, say.New("sign in, or send an API key: Authorization: Bearer pk_…"))
+			request.WriteTyped(w, r, http.StatusUnauthorized, api.ProblemTypeSignedOut, say.New("sign in, or send an API key: Authorization: Bearer pk_…"))
 			return
 		}
 		a.member(next.ServeHTTP)(w, r)
@@ -172,7 +175,7 @@ func (a *App) caller(account, keysOnly map[string]bool, next http.Handler) http.
 func (a *App) apiScope(scopes map[string][]string) api.StrictMiddlewareFunc {
 	return func(f api.StrictHandlerFunc, op string) api.StrictHandlerFunc {
 		return func(ctx context.Context, w http.ResponseWriter, r *http.Request, in any) (any, error) {
-			q, need := reqFrom(ctx), scopes[op]
+			q, need := request.ReqFrom(ctx), scopes[op]
 			switch {
 			// One that names no key scope is for people signed in, never a key.
 			case q.Key != nil && (keyless[op] || len(need) == 0):
@@ -182,10 +185,10 @@ func (a *App) apiScope(scopes map[string][]string) api.StrictMiddlewareFunc {
 				challenge(w, r, http.StatusForbidden, "insufficient_scope", need[0], say.Errorf("this key lacks the %s scope", strings.Join(need, " or ")))
 				return nil, nil
 			case q.Key == nil && slices.ContainsFunc(need, ownersOnly) && !q.Owner():
-				writeProblem(w, r, http.StatusForbidden, say.New("only an owner of this organisation can change that"))
+				request.WriteProblem(w, r, http.StatusForbidden, say.New("only an owner of this organisation can change that"))
 				return nil, nil
 			case q.Key == nil && q.Org != nil && !q.Member.Works(opArea[op]):
-				writeProblem(w, r, http.StatusForbidden, areaRefusal(opArea[op]))
+				request.WriteProblem(w, r, http.StatusForbidden, areaRefusal(opArea[op]))
 				return nil, nil
 			}
 			return f(ctx, w, r, in)
@@ -276,15 +279,15 @@ func savedMessage(c *Agent) string {
 }
 
 func (s apiServer) ListAgents(ctx context.Context, in api.ListAgentsRequestObject) (api.ListAgentsResponseObject, error) {
-	all, err := s.a.s.Agents(reqFrom(ctx).Org.ID)
+	all, err := s.a.s.Agents(request.ReqFrom(ctx).Org.ID)
 	if err != nil {
 		return nil, err
 	}
-	list, next, err := listPage(all, in.Params.Limit, in.Params.Cursor)
+	list, next, err := paging.ListPage(all, in.Params.Limit, in.Params.Cursor)
 	if err != nil {
 		return nil, err
 	}
-	out := api.ListAgents200JSONResponse{Headers: api.ListAgents200ResponseHeaders{Link: nextLink(ctx, next)}}
+	out := api.ListAgents200JSONResponse{Headers: api.ListAgents200ResponseHeaders{Link: request.NextLink(ctx, next)}}
 	out.Body.Items, out.Body.NextCursor = []api.Agent{}, next
 	for _, c := range list {
 		out.Body.Items = append(out.Body.Items, agentOut(c, all, request.LanguageFrom(ctx)))
@@ -293,7 +296,7 @@ func (s apiServer) ListAgents(ctx context.Context, in api.ListAgentsRequestObjec
 }
 
 func (s apiServer) GetAgent(ctx context.Context, in api.GetAgentRequestObject) (api.GetAgentResponseObject, error) {
-	org := reqFrom(ctx).Org.ID
+	org := request.ReqFrom(ctx).Org.ID
 	c, err := s.a.s.AgentByID(org, in.Id)
 	if err != nil {
 		return nil, err
@@ -307,7 +310,7 @@ func (s apiServer) CreateAgent(ctx context.Context, in api.CreateAgentRequestObj
 	if err != nil {
 		return nil, err
 	}
-	q := reqFrom(ctx)
+	q := request.ReqFrom(ctx)
 	c, err := s.a.saveAgent(ctx, q.Org.ID, settings, q.Actor())
 	if err != nil {
 		return nil, err
@@ -321,7 +324,7 @@ func (s apiServer) UpdateAgent(ctx context.Context, in api.UpdateAgentRequestObj
 	if err != nil {
 		return nil, err
 	}
-	q := reqFrom(ctx)
+	q := request.ReqFrom(ctx)
 	c, err := s.a.saveAgent(ctx, q.Org.ID, settings, q.Actor())
 	if err != nil {
 		return nil, err
@@ -331,14 +334,14 @@ func (s apiServer) UpdateAgent(ctx context.Context, in api.UpdateAgentRequestObj
 }
 
 func (s apiServer) DeleteAgent(ctx context.Context, in api.DeleteAgentRequestObject) (api.DeleteAgentResponseObject, error) {
-	if err := s.a.deleteAgent(reqFrom(ctx).Org.ID, in.Id); err != nil {
+	if err := s.a.deleteAgent(request.ReqFrom(ctx).Org.ID, in.Id); err != nil {
 		return nil, err
 	}
 	return api.DeleteAgent204Response{}, nil
 }
 
 func (s apiServer) ListRuns(ctx context.Context, in api.ListRunsRequestObject) (api.ListRunsResponseObject, error) {
-	org := reqFrom(ctx).Org.ID
+	org := request.ReqFrom(ctx).Org.ID
 	if _, err := s.a.s.TaskByID(org, in.Task); err != nil {
 		return nil, err
 	}
@@ -346,14 +349,14 @@ func (s apiServer) ListRuns(ctx context.Context, in api.ListRunsRequestObject) (
 	if err != nil {
 		return nil, err
 	}
-	runs, next, err := listPage(runs, in.Params.Limit, in.Params.Cursor)
+	runs, next, err := paging.ListPage(runs, in.Params.Limit, in.Params.Cursor)
 	if err != nil {
 		return nil, err
 	}
-	out := api.ListRuns200JSONResponse{Headers: api.ListRuns200ResponseHeaders{Link: nextLink(ctx, next)}}
+	out := api.ListRuns200JSONResponse{Headers: api.ListRuns200ResponseHeaders{Link: request.NextLink(ctx, next)}}
 	out.Body.Items, out.Body.NextCursor = []api.Run{}, next
 	for _, r := range runs {
-		out.Body.Items = append(out.Body.Items, runOut(r))
+		out.Body.Items = append(out.Body.Items, research.RunOut(r))
 	}
 	return out, nil
 }
@@ -362,16 +365,16 @@ func (s apiServer) StartRun(ctx context.Context, in api.StartRunRequestObject) (
 	if in.Body == nil {
 		return nil, say.New("say which agent: {\"agent\": id}")
 	}
-	q := reqFrom(ctx)
+	q := request.ReqFrom(ctx)
 	run, err := s.a.StartRun(q.Org.ID, in.Task, in.Body.Agent, q.Actor())
 	if err != nil {
 		return nil, err
 	}
-	return api.StartRun201JSONResponse(runOut(*run)), nil
+	return api.StartRun201JSONResponse(research.RunOut(*run)), nil
 }
 
 func (s apiServer) StopRun(ctx context.Context, in api.StopRunRequestObject) (api.StopRunResponseObject, error) {
-	if err := s.a.StopRun(reqFrom(ctx).Org.ID, in.Id); err != nil {
+	if err := s.a.StopRun(request.ReqFrom(ctx).Org.ID, in.Id); err != nil {
 		return nil, err
 	}
 	return api.StopRun204Response{}, nil

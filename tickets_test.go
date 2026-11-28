@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/tickets"
 )
 
@@ -19,7 +20,7 @@ func TestAnEnquiryWaitsToBeAnswered(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Someone already known here, so what they send is matched to them and their company.
-	known := must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, u.Name))
+	known := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, u.Name))
 	help := must(s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Kind: "support", Name: "Hannah Pryce", Email: "hannah@larkmoor.example", Message: "Colours look pale on phones"}))
 	stranger := must(s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Kind: "sales", Email: "sven@nordkap.example", Message: "What does it cost?"}))
 	spam := must(s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Email: "bot@spam.example", Message: "Buy now", Trap: "filled"}))
@@ -207,7 +208,7 @@ func TestAnEnquiryBecomesAConversation(t *testing.T) {
 	}
 
 	// From someone already here and in outreach: they move onto the board as they are.
-	known := must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
+	known := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
 	demo := must(s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Kind: "demo", Name: "H Pryce", Email: "hannah@larkmoor.example", Message: "Can we see it?"}))
 	if code, body := converse(demo.ID); code != http.StatusCreated {
 		t.Fatalf("a conversation with someone already here: %d %s", code, body)
@@ -266,7 +267,7 @@ func TestAnEnquiryBecomesAConversation(t *testing.T) {
 	}
 
 	// Someone matched, then put on the never-contact list, stays off the board.
-	late := must(s.QuickAddPerson(o, QuickAdd{Name: "Tom Ellery", Company: "Brightwater Caravans", Email: "tom@brightwater.example"}, "Ada Lovelace"))
+	late := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Tom Ellery", Company: "Brightwater Caravans", Email: "tom@brightwater.example"}, "Ada Lovelace"))
 	fromTom := must(s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Kind: "sales", Email: "tom@brightwater.example", Message: "Hello"}))
 	o.Settings.NeverContact = "blocked.example\nbrightwater.example"
 	if err := s.SaveOrg(o); err != nil {

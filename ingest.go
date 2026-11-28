@@ -7,6 +7,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/privacy"
 	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/tz"
@@ -26,7 +27,7 @@ func (s *Store) Import(org int64, p *ImportPayload) (int64, error) {
 		return strings.EqualFold(strings.TrimSpace(fresh), strings.TrimSpace(deref(have)))
 	}
 	for _, d := range p.Drafts {
-		if err := erased(s.DB, org, d.Person, d.Maker, d.Email, d.Linkedin); err != nil {
+		if err := crm.ErasedIn(s.DB, org, d.Person, d.Maker, d.Email, d.Linkedin); err != nil {
 			if !errors.Is(err, errErased) {
 				return 0, err
 			}

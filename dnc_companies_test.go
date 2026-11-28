@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/prospecting"
+	"github.com/shutthegoatup/prospector/internal/research"
 )
 
 func TestTheNeverContactListCoversACompanyByItsDomain(t *testing.T) {
@@ -33,9 +35,9 @@ func TestANeverContactCompanyIsKeptButLeftOut(t *testing.T) {
 	}
 	task := must(s.CreateTask(o.ID, "", "Boat makers.", "Ada Lovelace"))
 	scout := Actor{Name: "agent:scout", KeyID: 1}
-	nordkap := must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Nordkap Boats", Domain: "nordkap.example", Task: task.ID,
-		Facts: []FactIn{{Field: "size", Value: "60 staff", SourceURL: "https://nordkap.example/about"}}}))
-	must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Halvard Marine", Domain: "halvard.example", Task: task.ID}))
+	nordkap := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Nordkap Boats", Domain: "nordkap.example", Task: task.ID,
+		Facts: []research.FactIn{{Field: "size", Value: "60 staff", SourceURL: "https://nordkap.example/about"}}}))
+	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Halvard Marine", Domain: "halvard.example", Task: task.ID}))
 
 	// Kept, with what was found.
 	if _, body := call(t, ada, "GET", fmt.Sprintf("%s/o/alpha/api/v1/companies/%d/overview", srv.URL, nordkap.ID), "", nil); !strings.Contains(body, "60 staff") {
@@ -83,8 +85,8 @@ func TestANeverContactCompanyIsLeftOutOfAnOfferingsSearchToo(t *testing.T) {
 	s, o, srv, ada := signedIn(t)
 	scout := Actor{Name: "agent:scout", KeyID: 1}
 	cto := must(s.AddOffering(o.ID, Offering{Name: "Interim CTO"}, "Ada"))
-	belair := must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Belair Kitchens", Domain: "belair.example"}))
-	if err := s.SetCompanyStage(o.ID, belair.ID, CompanyQualified, "", "Ada Lovelace"); err != nil {
+	belair := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Belair Kitchens", Domain: "belair.example"}))
+	if err := s.SetCompanyStage(o.ID, belair.ID, prospecting.CompanyQualified, "", "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
 	o.Settings.NeverContact = "belair.example, nordkap.example"
@@ -92,8 +94,8 @@ func TestANeverContactCompanyIsLeftOutOfAnOfferingsSearchToo(t *testing.T) {
 		t.Fatal(err)
 	}
 	task := must(s.CreateTaskFor(o.ID, cto.ID, "", "Scale-ups.", "Ada Lovelace"))
-	must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Nordkap Boats", Domain: "nordkap.example", Task: task.ID}))
-	must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Belair Kitchens", Task: task.ID}))
+	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Nordkap Boats", Domain: "nordkap.example", Task: task.ID}))
+	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Belair Kitchens", Task: task.ID}))
 
 	_, queue := call(t, ada, "GET", fmt.Sprintf("%s/o/alpha/api/v1/research?task=%d&offering=%d", srv.URL, task.ID, cto.ID), "", nil)
 	if strings.Contains(queue, "Nordkap Boats") || strings.Contains(queue, "Belair Kitchens") {

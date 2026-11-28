@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/identity"
 )
 
 // The app offers each area's work, and marks the sidebar's pages "view", by the nav's
@@ -35,8 +36,8 @@ func TestTheNavOffersOnlyWorkTheAPIAllows(t *testing.T) {
 		areas []string
 	}{
 		{"ada@example.com", nil},
-		{"grace@example.com", []string{areaSupport}},
-		{"alan@example.com", []string{areaSales}},
+		{"grace@example.com", []string{identity.AreaSupport}},
+		{"alan@example.com", []string{identity.AreaSales}},
 		{"carol@example.com", nil},
 	} {
 		cl := owner
@@ -83,6 +84,6 @@ func TestTheNavOffersOnlyWorkTheAPIAllows(t *testing.T) {
 
 // pageArea is the area whose work a page in the sidebar is.
 var pageArea = map[string]string{
-	"today": areaSales, "research": areaSales, "conversations": areaSales, "campaigns": areaSales, "tasks": areaSales,
-	"enquiries": areaSupport, "onboarding": areaSupport, "subscriptions": areaSupport,
+	"today": identity.AreaSales, "research": identity.AreaSales, "conversations": identity.AreaSales, "campaigns": identity.AreaSales, "tasks": identity.AreaSales,
+	"enquiries": identity.AreaSupport, "onboarding": identity.AreaSupport, "subscriptions": identity.AreaSupport,
 }

@@ -15,6 +15,8 @@ import (
 
 	"golang.org/x/oauth2"
 
+	"github.com/shutthegoatup/prospector/internal/identity"
+	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/say"
 )
 
@@ -62,7 +64,7 @@ func (a *App) signInProblem(w http.ResponseWriter, r *http.Request, next string,
 	if next != "" {
 		back += "?" + url.Values{"next": {safeNext(next)}}.Encode()
 	}
-	lang := languageOf(r)
+	lang := request.LanguageOf(r)
 	title := say.New("Couldn't sign in").In(lang)
 	_, message := problemText(lang, http.StatusBadRequest, problem.In(lang))
 	writeShell(w, lang, code, problemShown{"problem", code, title, message, back}, title+": "+message+"\n")
@@ -157,7 +159,7 @@ func (a *App) loginCallback(w http.ResponseWriter, r *http.Request) {
 	refuse := func(err error) {
 		log.Printf("sign-in through %s refused: %v", att.Way, err)
 		var problem say.Sayer = say.New("That sign-in couldn't be completed. Try again, or sign in another way.")
-		for _, known := range []error{errNoAccount, errUnvouched, errElsewhere, errNotMember, errWrongDomain, errDisowned} {
+		for _, known := range []error{identity.ErrNoAccount, identity.ErrUnvouched, identity.ErrElsewhere, identity.ErrNotMember, errWrongDomain, errDisowned} {
 			if errors.Is(err, known) {
 				problem = sentence(err)
 			}
@@ -318,7 +320,7 @@ type ssoIn struct {
 	AutoJoin bool   `json:"auto_join"`
 }
 
-func (a *App) saveSSO(ctx context.Context, q *Req, in ssoIn) error {
+func (a *App) saveSSO(ctx context.Context, q *request.Req, in ssoIn) error {
 	sso, err := a.s.SSO(q.Org.ID)
 	if err != nil {
 		return err

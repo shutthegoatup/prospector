@@ -4,14 +4,16 @@ import (
 	"fmt"
 	"testing"
 	"time"
+
+	"github.com/shutthegoatup/prospector/internal/research"
 )
 
 func TestATasksPageHasPagesOfEachList(t *testing.T) {
 	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	task := must(s.CreateTask(o.ID, "", "Find makers of garden rooms", "Nia"))
-	co := must(s.AgentAddCompany(o.ID, Actor{Name: "agent:scout"}, AddCompanyIn{Name: "Larkmoor"}))
-	notes := make([]TaskNote, taskNotesPageSize+5)
+	co := must(s.AgentAddCompany(o.ID, Actor{Name: "agent:scout"}, research.AddCompanyIn{Name: "Larkmoor"}))
+	notes := make([]TaskNote, research.TaskNotesPageSize+5)
 	for i := range notes {
 		notes[i] = TaskNote{OrgID: o.ID, TaskID: task.ID, CompanyID: co.ID, Actor: "agent:scout", Kind: "next", Text: fmt.Sprint("Left note ", i, ".")}
 	}
@@ -43,7 +45,7 @@ func TestATasksPageHasPagesOfEachList(t *testing.T) {
 	// The task's page reads each list through the API, a page at a time and each on its
 	// own cursor.
 	base := fmt.Sprintf("%s/o/alpha/api/v1/tasks/%d/", srv.URL, task.ID)
-	notePages := apiPages(t, client, base+"notes?limit="+fmt.Sprint(taskNotesPageSize))
+	notePages := apiPages(t, client, base+"notes?limit="+fmt.Sprint(research.TaskNotesPageSize))
 	if len(notePages) != 2 || len(notePages[1].Items) != 5 || notePages[1].Items[4]["text"] != "Left note 0." || notePages[0].Items[0]["company"] != "Larkmoor" {
 		t.Fatalf("the task's notes should come in two pages, oldest last: %d", len(notePages))
 	}

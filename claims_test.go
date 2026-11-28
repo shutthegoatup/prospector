@@ -12,6 +12,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/shutthegoatup/prospector/internal/paging"
+	"github.com/shutthegoatup/prospector/internal/research"
 )
 
 func TestTwoAgentsOnATaskTakeDifferentRequests(t *testing.T) {
@@ -24,14 +25,14 @@ func TestTwoAgentsOnATaskTakeDifferentRequests(t *testing.T) {
 
 	first := must(s.AgentTaskAt(o.ID, scout, task.ID, now))
 	brief := first.Requests[0].ID
-	if first.Claimed != brief || !first.Requests[0].Yours || first.Status != TaskWorking {
+	if first.Claimed != brief || !first.Requests[0].Yours || first.Status != research.TaskWorking {
 		t.Fatalf("the first agent should be kept the brief: %+v", first)
 	}
 	got := must(s.AgentTaskAt(o.ID, second, task.ID, now.Add(time.Minute)))
 	if got.Claimed != 0 || got.Requests[0].HeldBy != "agent:scout" || got.Requests[0].Yours || got.Requests[0].Until == nil {
 		t.Fatalf("the second agent should see the brief is the first's: %+v", got)
 	}
-	if list := must(firstOf(s.AgentTasks(o.ID, second, paging.Page{}))); list[0].Status != TaskWorking || list[0].Open[0].HeldBy != "agent:scout" {
+	if list := must(firstOf(s.AgentTasks(o.ID, second, paging.Page{}))); list[0].Status != research.TaskWorking || list[0].Open[0].HeldBy != "agent:scout" {
 		t.Fatalf("list_tasks should say who holds the brief: %+v", list[0])
 	}
 
@@ -91,19 +92,19 @@ func TestAClaimLapsesUnlessTheHolderKeepsAdding(t *testing.T) {
 	if err := s.DB.Model(&RequestClaim{}).Where("request_id = ?", brief).Update("expires_at", time.Now().Add(5*time.Minute).UnixMilli()).Error; err != nil {
 		t.Fatal(err)
 	}
-	must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Task: task.ID, Name: "Larkmoor Yachts"}))
-	if left := time.Until(expires()); left < claimFor-time.Minute {
+	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Task: task.ID, Name: "Larkmoor Yachts"}))
+	if left := time.Until(expires()); left < research.ClaimFor-time.Minute {
 		t.Fatalf("a write for the task should renew the claim, %s left", left)
 	}
 	// Another agent's write for the task leaves the claim where it was.
 	before := expires()
-	must(s.AgentAddCompany(o.ID, second, AddCompanyIn{Task: task.ID, Name: "Corvane"}))
+	must(s.AgentAddCompany(o.ID, second, research.AddCompanyIn{Task: task.ID, Name: "Corvane"}))
 	if !expires().Equal(before) {
 		t.Fatal("another agent's write moved the holder's claim")
 	}
 
 	// Once it has lapsed the request is free for whoever picks the task up next.
-	later := time.Now().Add(claimFor + time.Minute)
+	later := time.Now().Add(research.ClaimFor + time.Minute)
 	got := must(s.AgentTaskAt(o.ID, second, task.ID, later))
 	if got.Claimed != brief || !got.Requests[0].Yours {
 		t.Fatalf("a lapsed claim should pass to the next agent: %+v", got)
@@ -111,7 +112,7 @@ func TestAClaimLapsesUnlessTheHolderKeepsAdding(t *testing.T) {
 	if mine := must(s.AgentTaskAt(o.ID, scout, task.ID, later)); mine.Claimed != 0 || mine.Requests[0].HeldBy != "agent:second" {
 		t.Fatalf("the agent that let it lapse should see it taken: %+v", mine)
 	}
-	if v := must(s.Task(o.ID, task.ID, later.Add(claimFor+runGap))); v.Status != TaskWaiting || v.Requests[0].HeldBy != "" {
+	if v := must(s.Task(o.ID, task.ID, later.Add(research.ClaimFor+research.RunGap))); v.Status != research.TaskWaiting || v.Requests[0].HeldBy != "" {
 		t.Fatalf("a task nobody has touched since its claim lapsed should be waiting: %s %+v", v.Status, v.Requests[0])
 	}
 }
@@ -182,7 +183,7 @@ func TestTwoClientsOnOneKeyTakeDifferentRequests(t *testing.T) {
 		if err != nil || res.IsError {
 			t.Fatalf("get_task: %v %+v", err, res)
 		}
-		var out TaskOut
+		var out research.TaskOut
 		raw, _ := json.Marshal(res.StructuredContent)
 		if err := json.Unmarshal(raw, &out); err != nil {
 			t.Fatal(err)
@@ -227,7 +228,7 @@ func TestAClaimIsntTakenOnAFinishedRequestOrShownOnAClosedTask(t *testing.T) {
 	}
 	must(s.AgentTaskAt(o.ID, scout, task.ID, now))
 	held := must(s.Task(o.ID, task.ID, now))
-	later := now.Add(claimFor + time.Minute)
+	later := now.Add(research.ClaimFor + time.Minute)
 	if won := must(s.Claim(o.ID, task.ID, request, second, later)); !won {
 		t.Fatal("a lapsed claim should pass to another agent")
 	}

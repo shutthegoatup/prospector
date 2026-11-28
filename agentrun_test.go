@@ -14,6 +14,7 @@ import (
 
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/agents"
+	"github.com/shutthegoatup/prospector/internal/research"
 )
 
 const searchTool = "brave-search_brave_web_search"
@@ -375,7 +376,7 @@ func TestSeveralAgentsWorkOneTaskEachOnItsOwnRequest(t *testing.T) {
 		<-release
 		// What get_task kept for this run is in its opening message.
 		msgs := messagesOf(body)
-		var opened TaskOut
+		var opened research.TaskOut
 		if text := fmt.Sprint(msgs[1]["content"]); strings.Contains(text, "{") {
 			json.Unmarshal([]byte(text[strings.Index(text, "{"):]), &opened)
 		}
@@ -545,7 +546,7 @@ func TestTheSourceGuardHoldsForEveryWayToCiteAPage(t *testing.T) {
 	ts := &turnState{seen: map[string]bool{}}
 	ts.see(`See https://en.wikipedia.org/wiki/Acme_(company). And (https://larkmoor.example/team) and {"u":"https://x.example/a?b=1&c=2"}`)
 	for _, u := range []string{"https://en.wikipedia.org/wiki/Acme_(company)", "https://larkmoor.example/team", "https://x.example/a?b=1&c=2"} {
-		if !ts.seen[normalURL(u)] {
+		if !ts.seen[research.NormalURL(u)] {
 			t.Errorf("a page shown wasn't recognised: %s (seen %v)", u, ts.seen)
 		}
 	}

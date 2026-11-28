@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/shutthegoatup/prospector/internal/marketing"
 	"github.com/shutthegoatup/prospector/internal/paging"
 	"github.com/shutthegoatup/prospector/internal/sales"
 )
@@ -108,10 +109,10 @@ func TestPostmarkBouncesAndComplaintsStopEveryCampaign(t *testing.T) {
 		t.Errorf("another organisation's list changed: %v", got)
 	}
 	mail := mailOf(t, s, o, c)
-	if r := mail["hannah@larkmoor.example"]; r.Status != MailFailed || !strings.Contains(r.Reason, "bounced") {
+	if r := mail["hannah@larkmoor.example"]; r.Status != marketing.MailFailed || !strings.Contains(r.Reason, "bounced") {
 		t.Errorf("the mail that bounced: %+v", r)
 	}
-	if mail["sven@nordkap.example"].Status != MailSent || mail["tom@larkmoor.example"].Status != MailSent {
+	if mail["sven@nordkap.example"].Status != marketing.MailSent || mail["tom@larkmoor.example"].Status != marketing.MailSent {
 		t.Errorf("mail that arrived: %+v", mail)
 	}
 
@@ -123,7 +124,7 @@ func TestPostmarkBouncesAndComplaintsStopEveryCampaign(t *testing.T) {
 	if _, err := s.AddSubscription(o.ID, sales.SubscriptionIn{Company: *hannah.CompanyID, Name: "Standard plan", Start: "2026-01-12", TermMonths: 12}, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	notice := must(s.AddCampaign(o.ID, CampaignIn{Name: "Price change", Kind: KindService, Audience: AudienceCustomers, Subject: "Your price", Body: "It changes in March."}, "Ada Lovelace"))
+	notice := must(s.AddCampaign(o.ID, marketing.CampaignIn{Name: "Price change", Kind: KindService, Audience: AudienceCustomers, Subject: "Your price", Body: "It changes in March."}, "Ada Lovelace"))
 	got := leftOut(must(s.Audience(o, *notice)))
 	if got["Hannah Pryce"] != "mail to them bounced" || got["Sven Dahl"] != "marked a mail as spam" || got["Tom Ellery"] != "" {
 		t.Errorf("a service notice's audience: %q", got)
@@ -158,13 +159,13 @@ func TestABounceIsKeptBesideWhyTheyAreOnTheList(t *testing.T) {
 	s, o, _, _ := signedIn(t)
 	unsubscribe := func(addr string) {
 		t.Helper()
-		if _, err := s.SuppressIn(s.DB, o.ID, addr, SuppressUnsubscribed, ""); err != nil {
+		if _, err := s.SuppressIn(s.DB, o.ID, addr, marketing.SuppressUnsubscribed, ""); err != nil {
 			t.Fatal(err)
 		}
 	}
 	bounces := func(addr string) {
 		t.Helper()
-		if err := s.MailFailed(o.ID, addr, SuppressBounced, "it bounced (HardBounce)"); err != nil {
+		if err := s.MailFailed(o.ID, addr, marketing.SuppressBounced, "it bounced (HardBounce)"); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -175,7 +176,7 @@ func TestABounceIsKeptBesideWhyTheyAreOnTheList(t *testing.T) {
 	must(s.Suppress(o.ID, "added@larkmoor.example", "Ada Lovelace"))
 	bounces("added@larkmoor.example")
 	bounces("spam@larkmoor.example")
-	if err := s.MailFailed(o.ID, "spam@larkmoor.example", SuppressComplained, ""); err != nil {
+	if err := s.MailFailed(o.ID, "spam@larkmoor.example", marketing.SuppressComplained, ""); err != nil {
 		t.Fatal(err)
 	}
 	unsubscribe("spam@larkmoor.example")
@@ -192,11 +193,11 @@ func TestABounceIsKeptBesideWhyTheyAreOnTheList(t *testing.T) {
 	}
 	g := must(s.Gate(s.DB, o))
 	for _, addr := range []string{"first@larkmoor.example", "then@larkmoor.example", "added@larkmoor.example"} {
-		if err := g.WhyFor(KindService, addr, ""); err != errBounced {
+		if err := g.WhyFor(KindService, addr, ""); err != marketing.ErrBounced {
 			t.Errorf("a service notice to %s, which bounced: %v", addr, err)
 		}
 	}
-	if err := g.WhyFor(KindService, "spam@larkmoor.example", ""); err != errComplained {
+	if err := g.WhyFor(KindService, "spam@larkmoor.example", ""); err != marketing.ErrComplained {
 		t.Errorf("a service notice to someone who complained: %v", err)
 	}
 }

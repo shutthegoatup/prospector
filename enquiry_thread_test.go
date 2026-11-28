@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/mailer"
 	"github.com/shutthegoatup/prospector/internal/tickets"
 )
@@ -305,7 +306,7 @@ func TestRepliesKeepToTheirLimits(t *testing.T) {
 	box.take(t, 1)
 
 	// Someone erased is not written to, though their enquiry was never matched to them.
-	bob := must(s.QuickAddPerson(o, QuickAdd{Name: "Bob Carr", Company: "Larkmoor Yachts", Email: "bob@larkmoor.example"}, "Ada Lovelace"))
+	bob := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Bob Carr", Company: "Larkmoor Yachts", Email: "bob@larkmoor.example"}, "Ada Lovelace"))
 	if err := s.ErasePerson(o.ID, bob.ID, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
@@ -329,7 +330,7 @@ func TestTheEnquiriesAPIGivesWhatThePageShows(t *testing.T) {
 	t.Parallel()
 	s, srv, member, _ := mailSite(t, nil)
 	o := must(s.OrgBySlug("alpha"))
-	known := must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Quay Marine", Email: "hannah@quay.example"}, "Ada Lovelace"))
+	known := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Hannah Pryce", Company: "Quay Marine", Email: "hannah@quay.example"}, "Ada Lovelace"))
 	e := must(s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Kind: "sales", Name: "Hannah Pryce", Email: "hannah@quay.example", Message: "What does it cost?"}))
 	must(s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Kind: "support", Email: "omar@reef.example", Message: "It stalls."}))
 	must(s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Email: "bot@spam.example", Trap: "filled"}))

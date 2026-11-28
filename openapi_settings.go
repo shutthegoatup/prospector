@@ -9,6 +9,8 @@ import (
 	"unicode/utf8"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/request"
+	"github.com/shutthegoatup/prospector/internal/research"
 	"github.com/shutthegoatup/prospector/internal/say"
 )
 
@@ -17,11 +19,11 @@ func settingsOut(o *Org) api.Settings {
 	return api.Settings{Name: o.Name, Color: o.Color, EmailAfterDays: int32(set.EmailAfterDays), FollowupAfterDays: int32(set.FollowupAfterDays),
 		NoteTemplate: set.NoteTemplate, Pitch: set.Pitch, NeverContact: set.NeverContact, LookFor: set.LookFor, AgentGuidance: set.AgentGuidance,
 		EnquirySites: set.EnquirySites, OnboardingSteps: set.OnboardingSteps, Currency: set.Currency, PostalAddress: set.PostalAddress,
-		IncorporatedOnly: set.IncorporatedOnly, LookingFor: lookingFor(o.Settings), CustomerLanguage: set.CustomerLanguage}
+		IncorporatedOnly: set.IncorporatedOnly, LookingFor: research.LookingFor(o.Settings), CustomerLanguage: set.CustomerLanguage}
 }
 
 func (s apiServer) GetSettings(ctx context.Context, _ api.GetSettingsRequestObject) (api.GetSettingsResponseObject, error) {
-	o, err := s.a.s.OrgBySlug(reqFrom(ctx).Org.Slug)
+	o, err := s.a.s.OrgBySlug(request.ReqFrom(ctx).Org.Slug)
 	if err != nil {
 		return nil, err
 	}
@@ -32,7 +34,7 @@ func (s apiServer) ChangeSettings(ctx context.Context, in api.ChangeSettingsRequ
 	if in.Body == nil {
 		return nil, say.New("send what changes, such as {\"enquiry_sites\": \"https://www.example.com\"}")
 	}
-	q := reqFrom(ctx)
+	q := request.ReqFrom(ctx)
 	// Read afresh, so what this leaves out is what is saved now rather than what the
 	// request's copy held when it arrived.
 	o, err := s.a.s.OrgBySlug(q.Org.Slug)
@@ -41,20 +43,20 @@ func (s apiServer) ChangeSettings(ctx context.Context, in api.ChangeSettingsRequ
 	}
 	before := settingsOut(o)
 	c, set := in.Body, &o.Settings
-	put(&o.Name, c.Name)
-	put(&o.Color, c.Color)
+	request.Put(&o.Name, c.Name)
+	request.Put(&o.Color, c.Color)
 	putInt(&set.EmailAfterDays, c.EmailAfterDays)
 	putInt(&set.FollowupAfterDays, c.FollowupAfterDays)
-	put(&set.NoteTemplate, c.NoteTemplate)
-	put(&set.Pitch, c.Pitch)
-	put(&set.NeverContact, c.NeverContact)
-	put(&set.LookFor, c.LookFor)
-	put(&set.AgentGuidance, c.AgentGuidance)
-	put(&set.EnquirySites, c.EnquirySites)
-	put(&set.OnboardingSteps, c.OnboardingSteps)
-	put(&set.Currency, c.Currency)
-	put(&set.PostalAddress, c.PostalAddress)
-	put(&set.CustomerLanguage, c.CustomerLanguage)
+	request.Put(&set.NoteTemplate, c.NoteTemplate)
+	request.Put(&set.Pitch, c.Pitch)
+	request.Put(&set.NeverContact, c.NeverContact)
+	request.Put(&set.LookFor, c.LookFor)
+	request.Put(&set.AgentGuidance, c.AgentGuidance)
+	request.Put(&set.EnquirySites, c.EnquirySites)
+	request.Put(&set.OnboardingSteps, c.OnboardingSteps)
+	request.Put(&set.Currency, c.Currency)
+	request.Put(&set.PostalAddress, c.PostalAddress)
+	request.Put(&set.CustomerLanguage, c.CustomerLanguage)
 	if c.IncorporatedOnly != nil {
 		set.IncorporatedOnly = *c.IncorporatedOnly
 	}

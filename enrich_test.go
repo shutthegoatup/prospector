@@ -16,6 +16,9 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"github.com/shutthegoatup/prospector/internal/prospecting"
+	"github.com/shutthegoatup/prospector/internal/research"
 )
 
 // fakeHunter answers Email Finder from a table of "first last@domain" to address.
@@ -174,11 +177,11 @@ func TestAVendorsFindWaitsForAPersonMarkedWithTheVendor(t *testing.T) {
 		t.Errorf("%d lookups counted and %d made, want 1", used, f.calls())
 	}
 	// Long enough after, it is.
-	s.DB.Model(&Event{}).Where("contact_id = ? and action = ?", hannah.ID, "enrich:email").Update("at", time.Now().Add(-enrichAgain-time.Hour))
+	s.DB.Model(&Event{}).Where("contact_id = ? and action = ?", hannah.ID, "enrich:email").Update("at", time.Now().Add(-prospecting.EnrichAgain-time.Hour))
 	if _, out := enrich(t, client, api, hannah.ID, "email"); out.Results[0].Outcome != "has" || f.calls() != 2 {
 		t.Errorf("asked a month later: %+v after %d calls", out, f.calls())
 	}
-	if err := s.DecideSuggestion(o.ID, sg.ID, SuggestionAccepted, "Ada Lovelace"); err != nil {
+	if err := s.DecideSuggestion(o.ID, sg.ID, prospecting.SuggestionAccepted, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
 	c := reread(t, s, hannah.ID)
@@ -250,7 +253,7 @@ func TestNobodyTheOrganisationMustntContactIsLookedUp(t *testing.T) {
 	}
 
 	// Research says who can't be looked up, so it offers no lookup the server would refuse.
-	s.DB.Model(&Company{}).Where("org_id = ?", o.ID).Update("stage", CompanyReview)
+	s.DB.Model(&Company{}).Where("org_id = ?", o.ID).Update("stage", prospecting.CompanyReview)
 	code, body := call(t, client, "GET", api+"/research?filter=review", "", nil)
 	var list struct {
 		Items []struct {
@@ -311,8 +314,8 @@ func TestAVendorIsToldTheWholeNameOfSomeoneAnAgentAdded(t *testing.T) {
 	t.Parallel()
 	s, o, api, client, f := enrichSignedIn(t)
 	call(t, client, "PUT", api+"/enrichers", "application/json", map[string]any{"kind": "hunter", "api_key": hunterTestKey, "monthly_limit": 10})
-	must(s.AgentAddCompany(o.ID, Actor{Name: "agent:scout"}, AddCompanyIn{Name: "Bergholm", Domain: "bergholm.example"}))
-	added := must(s.AgentAddContact(o, Actor{Name: "agent:scout"}, AddContactIn{Company: "Bergholm", Name: "Dr. Kai van der Berg", Title: "Head of Digital",
+	must(s.AgentAddCompany(o.ID, Actor{Name: "agent:scout"}, research.AddCompanyIn{Name: "Bergholm", Domain: "bergholm.example"}))
+	added := must(s.AgentAddContact(o, Actor{Name: "agent:scout"}, prospecting.AddContactIn{Company: "Bergholm", Name: "Dr. Kai van der Berg", Title: "Head of Digital",
 		SourceURL: "https://bergholm.example/team"}))
 	f.found["Dr. Kai van der Berg@bergholm.example"] = "kai.vanderberg@bergholm.example"
 	if _, out := enrich(t, client, api, added.ID, "email"); out.Results[0].Outcome != "suggested" {
@@ -398,7 +401,7 @@ func TestResearchSaysWhatVendorsFoundAndWhenTheyCanBeAskedAgain(t *testing.T) {
 		}
 		for _, l := range p.Lookups {
 			line += " " + l.Field + " " + l.Vendor + " " + l.Outcome
-			if l.AgainAt.Sub(l.At) != enrichAgain {
+			if l.AgainAt.Sub(l.At) != prospecting.EnrichAgain {
 				t.Errorf("%s can be asked again %v after", p.Name, l.AgainAt.Sub(l.At))
 			}
 		}
@@ -414,7 +417,7 @@ func TestResearchSaysWhatVendorsFoundAndWhenTheyCanBeAskedAgain(t *testing.T) {
 	}
 
 	// Once the 30 days are up, the lookup is no longer listed.
-	s.DB.Model(&Event{}).Where("contact_id = ?", ola.ID).Update("at", time.Now().Add(-enrichAgain-time.Hour))
+	s.DB.Model(&Event{}).Where("contact_id = ?", ola.ID).Update("at", time.Now().Add(-prospecting.EnrichAgain-time.Hour))
 	if _, body := call(t, client, "GET", api+"/research?filter=details", "", nil); strings.Contains(body, `"outcome":"none"`) {
 		t.Errorf("an old lookup is still listed: %s", body)
 	}

@@ -17,6 +17,8 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/identity"
+	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/signing"
 )
@@ -27,8 +29,8 @@ import (
 func ours(err error) bool {
 	var pg *pgconn.PgError
 	var network net.Error
-	if errors.As(err, &pg) || unstorable(err) {
-		return !unstorable(err)
+	if errors.As(err, &pg) || identity.Unstorable(err) {
+		return !identity.Unstorable(err)
 	}
 	return errors.As(err, &network) ||
 		errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) ||
@@ -89,7 +91,7 @@ func telling(where string, err error, code int) (int, say.Sayer) {
 	case breaksRule(err):
 		log.Printf("%s: %v", where, err)
 		return http.StatusConflict, say.New(sayTaken)
-	case unstorable(err):
+	case identity.Unstorable(err):
 		log.Printf("%s: %v", where, err)
 		return http.StatusBadRequest, say.New(sayUnstorable)
 	case errors.As(err, &clash):
@@ -129,7 +131,7 @@ func statusOf(err error) int {
 	var missing notFound
 	var away notSent
 	var clash conflict
-	var no refused
+	var no request.Refused
 	var theirs elsewhere
 	switch {
 	case errors.As(err, &no):
@@ -173,11 +175,11 @@ func apiFail(w http.ResponseWriter, r *http.Request, err error) {
 		if t.retry > 0 {
 			w.Header().Set("Retry-After", strconv.Itoa(t.retry))
 		}
-		writeTyped(w, r, t.status, t.kind, t.Text)
+		request.WriteTyped(w, r, t.status, t.kind, t.Text)
 		return
 	}
 	code, detail := telling(r.Method+" "+r.URL.Path, err, statusOf(err))
-	writeProblem(w, r, code, detail)
+	request.WriteProblem(w, r, code, detail)
 }
 
 // challenge refuses a request for want of a usable key, saying why in the header as
@@ -191,5 +193,5 @@ func challenge(w http.ResponseWriter, r *http.Request, code int, reason, scope s
 		header += fmt.Sprintf(`, scope=%q`, scope)
 	}
 	w.Header().Set("WWW-Authenticate", header)
-	writeProblem(w, r, code, detail)
+	request.WriteProblem(w, r, code, detail)
 }

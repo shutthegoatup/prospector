@@ -8,6 +8,8 @@ import (
 
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/paging"
+	"github.com/shutthegoatup/prospector/internal/prospecting"
+	"github.com/shutthegoatup/prospector/internal/research"
 )
 
 // Find asks for about so many companies: the searches list shows how far it has got
@@ -29,9 +31,9 @@ func TestASearchAsksForAboutSoManyCompanies(t *testing.T) {
 	}
 
 	scout := Actor{Name: "agent:scout", KeyID: 1}
-	must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Larkmoor Yachts", Domain: "larkmoor.example", Task: made.Id}))
-	kept := must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Halvard Marine", Domain: "halvard.example", Task: made.Id}))
-	if err := s.SetCompanyStage(o.ID, kept.ID, CompanyQualified, "A", "Ada Lovelace"); err != nil {
+	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor Yachts", Domain: "larkmoor.example", Task: made.Id}))
+	kept := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Halvard Marine", Domain: "halvard.example", Task: made.Id}))
+	if err := s.SetCompanyStage(o.ID, kept.ID, prospecting.CompanyQualified, "A", "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
 
