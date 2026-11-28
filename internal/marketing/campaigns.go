@@ -5,6 +5,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/shutthegoatup/prospector/internal/cleantext"
+
 	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
@@ -70,7 +72,7 @@ func campaignField(field, value string) (string, error) {
 		}
 	case "subject":
 		// One line: a subject is a header.
-		value = strings.Join(strings.Fields(value), " ")
+		value = cleantext.OneLine(value)
 		if utf8.RuneCountInString(value) > campaignSubjectLimit {
 			return "", say.Errorf("a subject is %d characters at most", campaignSubjectLimit)
 		}

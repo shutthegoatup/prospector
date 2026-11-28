@@ -4,6 +4,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/shutthegoatup/prospector/internal/cleantext"
+
 	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
@@ -88,7 +90,7 @@ type EnquiriesAround struct {
 // name. The form's sender chose every character, and a contact's name is read by
 // agents, so a paragraph of text isn't taken as one.
 func senderName(e store.Enquiry) string {
-	name := store.Clip(strings.Join(strings.Fields(e.Name), " "), 80)
+	name := store.Clip(cleantext.OneLine(e.Name), 80)
 	if name == "" {
 		name, _, _ = strings.Cut(e.Email, "@")
 	}

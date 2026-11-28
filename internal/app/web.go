@@ -14,6 +14,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/shutthegoatup/prospector/internal/cleantext"
+
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/charset"
 
@@ -130,8 +132,8 @@ func (a *App) webSearch(ctx context.Context, base, query string, page int) (stri
 		if i == 10 {
 			break
 		}
-		fmt.Fprintf(&b, "%d. %s\n   %s\n", i+1, oneLine(r.Title), r.URL)
-		if s := oneLine(r.Content); s != "" {
+		fmt.Fprintf(&b, "%d. %s\n   %s\n", i+1, cleantext.OneLine(r.Title), r.URL)
+		if s := cleantext.OneLine(r.Content); s != "" {
 			fmt.Fprintf(&b, "   %s\n", cut(s, 300))
 		}
 	}
@@ -211,7 +213,7 @@ func pageText(body []byte, base *url.URL) (string, string, [][2]string) {
 	for {
 		switch tt := z.Next(); tt { //nolint:exhaustive // Comments and doctypes say nothing a reader sees.
 		case html.ErrorToken:
-			return cut(oneLine(title.String()), 300), tidyText(text.String()), links
+			return cut(cleantext.OneLine(title.String()), 300), tidyText(text.String()), links
 		case html.StartTagToken, html.SelfClosingTagToken:
 			self := tt == html.SelfClosingTagToken
 			name, hasAttr := z.TagName()
@@ -253,7 +255,7 @@ func pageText(body []byte, base *url.URL) (string, string, [][2]string) {
 					to.Fragment = ""
 					if s := to.String(); !seen[s] {
 						seen[s] = true
-						links = append(links, [2]string{cut(oneLine(anchor.String()), 80), s})
+						links = append(links, [2]string{cut(cleantext.OneLine(anchor.String()), 80), s})
 					}
 				}
 				href = ""
@@ -283,7 +285,7 @@ func tidyText(s string) string {
 	var out []string
 	blank := false
 	for line := range strings.SplitSeq(s, "\n") {
-		line = oneLine(line)
+		line = cleantext.OneLine(line)
 		if line == "" {
 			blank = len(out) > 0
 			continue

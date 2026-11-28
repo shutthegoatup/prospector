@@ -9,8 +9,9 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
-	"strings"
 	"time"
+
+	"github.com/shutthegoatup/prospector/internal/cleantext"
 
 	"github.com/anthropics/anthropic-sdk-go/v2"
 	"github.com/anthropics/anthropic-sdk-go/v2/option"
@@ -55,7 +56,7 @@ func (a *App) claudeClient(c *store.Agent, key string) anthropic.Client {
 // claudeErr gives an SDK failure the shape the run waits on or ends with.
 func claudeErr(err error) error {
 	if refused, ok := errors.AsType[*anthropic.Error](err); ok {
-		e := &endpointError{Status: refused.StatusCode, Message: strings.Join(strings.Fields(refused.Message), " ")}
+		e := &endpointError{Status: refused.StatusCode, Message: cleantext.OneLine(refused.Message)}
 		if r := []rune(e.Message); len(r) > 200 {
 			e.Message = string(r[:200]) + "…"
 		}

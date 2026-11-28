@@ -18,6 +18,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/shutthegoatup/prospector/internal/cleantext"
+
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/shutthegoatup/prospector/internal/say"
@@ -69,7 +71,7 @@ func refusal(res *http.Response, now time.Time) error {
 	if json.Unmarshal(body, &shaped) == nil && shaped.Error.Message != "" {
 		e.Message = shaped.Error.Message
 	}
-	if r := []rune(strings.Join(strings.Fields(e.Message), " ")); len(r) > 200 {
+	if r := []rune(cleantext.OneLine(e.Message)); len(r) > 200 {
 		e.Message = string(r[:200]) + "…"
 	} else {
 		e.Message = string(r)
@@ -201,7 +203,7 @@ func (a *App) listTools(ctx context.Context, endpoint, key string) ([]store.Agen
 		if !toolName.MatchString(t.Name) || len(out) >= maxListed {
 			continue
 		}
-		desc := strings.Join(strings.Fields(t.Description), " ")
+		desc := cleantext.OneLine(t.Description)
 		if r := []rune(desc); len(r) > maxToolText {
 			desc = string(r[:maxToolText-1]) + "…"
 		}
@@ -234,7 +236,7 @@ type AgentSettingsIn struct {
 const maxAgentName = 40
 
 func agentName(raw string) (string, error) {
-	name := strings.Join(strings.Fields(raw), " ")
+	name := cleantext.OneLine(raw)
 	if name == "" {
 		return "", say.New("give the agent a name, such as the model it uses")
 	}

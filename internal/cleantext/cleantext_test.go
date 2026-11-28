@@ -7,6 +7,15 @@ import (
 	"testing/iotest"
 )
 
+func TestOneLine(t *testing.T) {
+	t.Parallel()
+	for in, want := range map[string]string{"  Larkmoor\n\tYachts  ": "Larkmoor Yachts", "": "", "one": "one", "a \r\n b": "a b"} {
+		if got := OneLine(in); got != want {
+			t.Errorf("OneLine(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
 func TestNULEscapesAreDroppedFromJSON(t *testing.T) {
 	t.Parallel()
 	for in, want := range map[string]string{

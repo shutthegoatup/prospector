@@ -18,6 +18,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/shutthegoatup/prospector/internal/cleantext"
+
 	"github.com/shutthegoatup/prospector/internal/say"
 )
 
@@ -189,7 +191,7 @@ func submit(conn net.Conn, via Server, from, to *mail.Address, m Message, secure
 func Compose(from, to *mail.Address, m Message, now time.Time) []byte {
 	var b bytes.Buffer
 	_, domain, _ := strings.Cut(from.Address, "@")
-	subject := strings.Join(strings.Fields(m.Subject), " ")
+	subject := cleantext.OneLine(m.Subject)
 	fmt.Fprintf(&b, "From: %s\r\nTo: %s\r\nSubject: %s\r\n", from.String(), to.String(), mime.QEncoding.Encode("utf-8", subject))
 	// Parsed and written back out, so nothing in it can start a header of its own.
 	if answer, err := mail.ParseAddress(m.ReplyTo); err == nil {

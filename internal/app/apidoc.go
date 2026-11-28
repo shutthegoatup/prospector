@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/shutthegoatup/prospector/internal/cleantext"
+
 	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/shutthegoatup/prospector/api"
@@ -69,7 +71,7 @@ type APIField struct {
 func apiDocOf(spec *openapi3.T) APIDoc {
 	doc := APIDoc{Title: spec.Info.Title, Version: spec.Info.Version}
 	for p := range strings.SplitSeq(strings.TrimSpace(spec.Info.Description), "\n\n") {
-		doc.Intro = append(doc.Intro, strings.Join(strings.Fields(p), " "))
+		doc.Intro = append(doc.Intro, cleantext.OneLine(p))
 	}
 	for _, s := range identity.Scopes {
 		doc.Scopes = append(doc.Scopes, APIScope{Name: s.Name, What: s.What.Error(), Owner: ownersOnly(s.Name)})
@@ -90,14 +92,14 @@ func apiDocOf(spec *openapi3.T) APIDoc {
 			if op == nil {
 				continue
 			}
-			o := APIOp{ID: op.OperationID, Method: method, Path: path, Summary: op.Summary, About: oneLine(op.Description)}
+			o := APIOp{ID: op.OperationID, Method: method, Path: path, Summary: op.Summary, About: cleantext.OneLine(op.Description)}
 			s := opScopes(op)
 			o.Scope, o.OwnerOnly = strings.Join(s, " or "), slices.ContainsFunc(s, ownersOnly)
 			for _, p := range append(slices.Clone(item.Parameters), op.Parameters...) {
 				if p.Value.Name == "org" {
 					continue
 				}
-				o.Params = append(o.Params, APIField{Name: p.Value.Name, Type: typeOf(p.Value.Schema), Required: p.Value.Required, About: oneLine(p.Value.Description)})
+				o.Params = append(o.Params, APIField{Name: p.Value.Name, Type: typeOf(p.Value.Schema), Required: p.Value.Required, About: cleantext.OneLine(p.Value.Description)})
 			}
 			if op.RequestBody != nil {
 				if mt := op.RequestBody.Value.Content.Get("application/json"); mt != nil {
@@ -108,7 +110,7 @@ func apiDocOf(spec *openapi3.T) APIDoc {
 			codes := slices.Sorted(maps.Keys(op.Responses.Map()))
 			for _, code := range codes {
 				res := op.Responses.Value(code).Value
-				r := APIResponse{Code: code, About: oneLine(store.Deref(res.Description))}
+				r := APIResponse{Code: code, About: cleantext.OneLine(store.Deref(res.Description))}
 				for _, mt := range res.Content {
 					r.Type = typeOf(mt.Schema)
 				}
@@ -186,7 +188,7 @@ func schemaOf(name string, ref *openapi3.SchemaRef) APISchema {
 		out.Of = typeOf(ref)
 	}
 	s := ref.Value
-	out.About = oneLine(s.Description)
+	out.About = cleantext.OneLine(s.Description)
 	for _, e := range s.Enum {
 		if v, ok := e.(string); ok {
 			out.Enum = append(out.Enum, v)
@@ -214,7 +216,7 @@ func schemaOf(name string, ref *openapi3.SchemaRef) APISchema {
 		prop := s.Properties[p]
 		about := ""
 		if prop.Value != nil {
-			about = oneLine(prop.Value.Description)
+			about = cleantext.OneLine(prop.Value.Description)
 		}
 		out.Fields = append(out.Fields, APIField{Name: p, Type: typeOf(prop), Required: slices.Contains(s.Required, p), About: about,
 			Write: prop.Value != nil && prop.Value.WriteOnly})
@@ -251,8 +253,6 @@ func typeOf(ref *openapi3.SchemaRef) string {
 	}
 	return t
 }
-
-func oneLine(s string) string { return strings.Join(strings.Fields(s), " ") }
 
 // codeSpans splits text on backticks, so `quoted` parts can be set as code.
 type textSpan struct {

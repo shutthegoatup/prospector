@@ -11,6 +11,10 @@ import (
 // Postgres won't keep a NUL in text, nor bytes that aren't UTF-8. No one means to send
 // either, so they are taken out of what arrives before anything reads it.
 
+// OneLine is s with every run of spaces, tabs and line breaks one space, and none at
+// either end: a name or a summary as it reads on one line.
+func OneLine(s string) string { return strings.Join(strings.Fields(s), " ") }
+
 func Text(s string) string {
 	if strings.IndexByte(s, 0) < 0 && isUTF8(s) {
 		return s
