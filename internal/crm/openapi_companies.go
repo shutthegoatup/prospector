@@ -150,6 +150,14 @@ var historyVerbs = map[string]*say.Text{
 	"onboard:done": say.New("finished an onboarding step"), "onboard:undone": say.New("reopened an onboarding step"),
 	"onboard:due":   say.New("moved an onboarding step's date"),
 	"enquiry:reply": say.New("emailed a reply to their enquiry"), "enquiry:heard": say.New("recorded their answer to an enquiry"),
+	"enquiry:remove": say.New("removed an enquiry"), "note:remove": say.New("removed a note"),
+	"agreement:add": say.New("started an agreement"), "agreement:remove": say.New("removed a draft agreement"),
+	"key:new": say.New("made an API key"), "key:scopes": say.New("changed what an API key may do"), "key:revoke": say.New("revoked an API key"),
+	"agent:new": say.New("added an agent"), "agent:change": say.New("changed an agent's settings"), "agent:remove": say.New("removed an agent"),
+	"domain:add": say.New("added a sign-on domain"), "domain:verify": say.New("verified a sign-on domain"), "domain:remove": say.New("removed a sign-on domain"),
+	"hook:new": say.New("made a new bounce webhook secret"), "hook:remove": say.New("removed the bounce webhook"),
+	"mail:change": say.New("changed the mail server"), "mail:remove": say.New("removed the mail server"),
+	"enricher:save": say.New("saved an enrichment vendor"), "enricher:remove": say.New("removed an enrichment vendor"),
 }
 
 // HistoryText is a history entry's line: what was done, to whom, and what with.

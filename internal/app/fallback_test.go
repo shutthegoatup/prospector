@@ -73,7 +73,7 @@ func TestAWaitingAgentHandsItsTaskToItsFallback(t *testing.T) {
 		t.Fatalf("a wait inside the allowance should be waited out: %+v, waited %v", run, r.sleeps)
 	}
 
-	if err := r.a.deleteAgent(r.o.ID, claudeID); err != nil {
+	if err := r.a.deleteAgent(r.o.ID, claudeID, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
 	if got := must(r.s.AgentByID(r.o.ID, first.ID)); got.FallbackID != 0 {

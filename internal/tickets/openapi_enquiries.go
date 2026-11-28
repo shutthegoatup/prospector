@@ -147,7 +147,8 @@ func (s TicketsAPI) ChangeEnquiry(ctx context.Context, in api.ChangeEnquiryReque
 }
 
 func (s TicketsAPI) DeleteEnquiry(ctx context.Context, in api.DeleteEnquiryRequestObject) (api.DeleteEnquiryResponseObject, error) {
-	if err := s.Enquiries.DeleteEnquiry(request.ReqFrom(ctx).Org.ID, in.Id); err != nil {
+	q := request.ReqFrom(ctx)
+	if err := s.Enquiries.DeleteEnquiry(q.Org.ID, in.Id, q.Actor()); err != nil {
 		return nil, err
 	}
 	return api.DeleteEnquiry204Response{}, nil

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
@@ -57,7 +58,7 @@ func (s *SsoStore) RequiresSSO(org int64) (bool, error) {
 	return c.Required, err
 }
 
-func (s *SsoStore) AddSSODomain(org int64, domain string) (*store.SSODomain, error) {
+func (s *SsoStore) AddSSODomain(org int64, domain, actor string) (*store.SSODomain, error) {
 	var n int64
 	if err := s.InOrg(org).Model(&store.SSODomain{}).Count(&n).Error; err != nil {
 		return nil, err
@@ -66,10 +67,16 @@ func (s *SsoStore) AddSSODomain(org int64, domain string) (*store.SSODomain, err
 		return nil, say.Errorf("an organisation can have %d domains", maxSSODomains)
 	}
 	d := &store.SSODomain{OrgID: org, Domain: domain, Token: store.RandomToken(20)}
-	if err := s.DB.Create(d).Error; err != nil {
-		if store.BreaksRule(err) {
-			err = store.Conflict{Text: say.Errorf("%s is already listed", domain)}
+	err := s.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(d).Error; err != nil {
+			return err
 		}
+		return s.Log(tx, org, 0, nil, actor, "domain:add", &domain)
+	})
+	if store.BreaksRule(err) {
+		err = store.Conflict{Text: say.Errorf("%s is already listed", domain)}
+	}
+	if err != nil {
 		return nil, err
 	}
 	return d, nil
@@ -86,12 +93,25 @@ func (s *SsoStore) SSODomain(org int64, domain string) (*store.SSODomain, error)
 	return &d, nil
 }
 
-func (s *SsoStore) VerifySSODomain(org, id int64, at time.Time) error {
-	return s.InOrg(org).Model(&store.SSODomain{}).Where("id = ?", id).Update("verified_at", &at).Error
+func (s *SsoStore) VerifySSODomain(org, id int64, at time.Time, actor string) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
+		var d store.SSODomain
+		res := tx.Model(&d).Clauses(clause.Returning{}).Where("org_id = ? and id = ?", org, id).Update("verified_at", &at)
+		if res.Error != nil || res.RowsAffected == 0 {
+			return res.Error
+		}
+		return s.Log(tx, org, 0, nil, actor, "domain:verify", &d.Domain)
+	})
 }
 
-func (s *SsoStore) RemoveSSODomain(org int64, domain string) error {
-	return s.InOrg(org).Where("domain = ?", domain).Delete(&store.SSODomain{}).Error
+func (s *SsoStore) RemoveSSODomain(org int64, domain, actor string) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
+		res := tx.Where("org_id = ? and domain = ?", org, domain).Delete(&store.SSODomain{})
+		if res.Error != nil || res.RowsAffected == 0 {
+			return res.Error
+		}
+		return s.Log(tx, org, 0, nil, actor, "domain:remove", &domain)
+	})
 }
 
 // SSOOrgsFor is the organisations whose own sign-in speaks for an email domain.

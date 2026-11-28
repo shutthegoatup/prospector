@@ -387,7 +387,7 @@ func TestAnAgentDeletedWhileSavingStaysDeleted(t *testing.T) {
 	r := newRunSetup(t, fake)
 	c := must(r.s.AgentByID(r.o.ID, r.agent))
 	key := must(r.s.AgentKey(r.o.ID, c))
-	if err := r.a.deleteAgent(r.o.ID, c.ID); err != nil {
+	if err := r.a.deleteAgent(r.o.ID, c.ID, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
 	c.Model = "something else"

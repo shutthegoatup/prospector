@@ -394,7 +394,7 @@ func TestAPIKeys(t *testing.T) {
 	if code, body := call(t, keyed(readOnly), "GET", api+"search?q=fjord", "", nil); code != http.StatusOK || !strings.Contains(body, "Fjordline") {
 		t.Fatalf("search: %d %s", code, body)
 	}
-	if err := s.RevokeKey(o.ID, writerKey.ID); err != nil {
+	if err := s.RevokeKey(o.ID, writerKey.ID, "Owner One"); err != nil {
 		t.Fatal(err)
 	}
 	if code, _ := call(t, keyed(writer), "GET", api+"due", "", nil); code != http.StatusUnauthorized {

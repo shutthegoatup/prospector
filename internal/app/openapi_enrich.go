@@ -54,7 +54,8 @@ func (s apiServer) SaveEnricher(ctx context.Context, in api.SaveEnricherRequestO
 }
 
 func (s apiServer) DeleteEnricher(ctx context.Context, in api.DeleteEnricherRequestObject) (api.DeleteEnricherResponseObject, error) {
-	if err := s.a.s.DeleteEnricher(request.ReqFrom(ctx).Org.ID, in.Id); err != nil {
+	q := request.ReqFrom(ctx)
+	if err := s.a.s.DeleteEnricher(q.Org.ID, in.Id, q.Actor()); err != nil {
 		return nil, err
 	}
 	return api.DeleteEnricher204Response{}, nil

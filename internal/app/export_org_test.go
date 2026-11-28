@@ -44,8 +44,8 @@ func TestExportOrg(t *testing.T) {
 	do(s.AddMember(other.ID, outsider.ID, "owner", outsider.Name))
 	do(s.SaveSSO(&store.SSOConnection{OrgID: o.ID, Issuer: "https://id.larkmoor.example", ClientID: "prospector-client", ClientSecret: "s3cret-client-value"}, "ada"))
 	do(s.DB.Create(&store.SSODomain{OrgID: o.ID, Domain: "alpha.example", Token: "dns-proof-token"}).Error)
-	do(s.SaveOrgMail(&store.OrgMail{OrgID: o.ID, Host: "smtp.alpha.example", Port: 587, Username: "mailer", Password: "sealed-mail-password", Sender: "Alpha <hello@alpha.example>"}))
-	do(s.SaveOrgMail(&store.OrgMail{OrgID: other.ID, Host: "smtp.beta.example", Port: 587, Sender: "beta@beta.example"}))
+	do(s.SaveOrgMail(o.ID, &store.OrgMail{OrgID: o.ID, Host: "smtp.alpha.example", Port: 587, Username: "mailer", Password: "sealed-mail-password", Sender: "Alpha <hello@alpha.example>"}, "Owner One"))
+	do(s.SaveOrgMail(other.ID, &store.OrgMail{OrgID: other.ID, Host: "smtp.beta.example", Port: 587, Sender: "beta@beta.example"}, "Owner One"))
 
 	jar, _ := cookiejar.New(nil)
 	bob := &http.Client{Jar: jar}

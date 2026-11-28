@@ -45,7 +45,12 @@ func (s *AgreementStore) AddAgreement(org, company int64, name, actor string) (*
 		return nil, store.Missing(err, "no company %d", company)
 	}
 	a := store.Agreement{OrgID: org, CompanyID: company, Name: name, Status: identity.AgreementDraft, Round: 1, InOrder: true, CreatedBy: actor, UpdatedBy: actor}
-	return &a, s.DB.Create(&a).Error
+	return &a, s.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&a).Error; err != nil {
+			return err
+		}
+		return s.Log(tx, org, 0, &company, actor, "agreement:add", &a.Name)
+	})
 }
 
 func (s *AgreementStore) Agreement(org, id int64) (*store.Agreement, error) {
@@ -93,9 +98,10 @@ func (s *AgreementStore) ChangeAgreement(org, id int64, name *string, inOrder *b
 	return a, nil
 }
 
-func (s *AgreementStore) RemoveAgreement(org, id int64) error {
+func (s *AgreementStore) RemoveAgreement(org, id int64, actor string) error {
 	return s.DB.Transaction(func(tx *gorm.DB) error {
-		res := tx.Where("org_id = ? and id = ? and status = ?", org, id, identity.AgreementDraft).Delete(&store.Agreement{})
+		var a store.Agreement
+		res := tx.Clauses(clause.Returning{}).Where("org_id = ? and id = ? and status = ?", org, id, identity.AgreementDraft).Delete(&a)
 		if res.Error != nil {
 			return res.Error
 		}
@@ -104,6 +110,9 @@ func (s *AgreementStore) RemoveAgreement(org, id int64) error {
 				return store.Missing(err, "no agreement %d", id)
 			}
 			return say.New("only a draft agreement can be removed; one that was sent is kept")
+		}
+		if err := s.Log(tx, org, 0, &a.CompanyID, actor, "agreement:remove", &a.Name); err != nil {
+			return err
 		}
 		for _, part := range []any{&store.AgreementFile{}, &store.AgreementRecipient{}, &store.AgreementField{}, &store.AgreementEvent{}} {
 			if err := tx.Where("org_id = ? and agreement_id = ?", org, id).Delete(part).Error; err != nil {

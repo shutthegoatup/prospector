@@ -335,7 +335,8 @@ func (s apiServer) UpdateAgent(ctx context.Context, in api.UpdateAgentRequestObj
 }
 
 func (s apiServer) DeleteAgent(ctx context.Context, in api.DeleteAgentRequestObject) (api.DeleteAgentResponseObject, error) {
-	if err := s.a.deleteAgent(request.ReqFrom(ctx).Org.ID, in.Id); err != nil {
+	q := request.ReqFrom(ctx)
+	if err := s.a.deleteAgent(q.Org.ID, in.Id, q.Actor()); err != nil {
 		return nil, err
 	}
 	return api.DeleteAgent204Response{}, nil

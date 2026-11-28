@@ -261,7 +261,7 @@ func TestEnquiryFromAProduct(t *testing.T) {
 	if theirs, _ := firstOf(s.Enquiries(other.ID, tickets.EnquiryFilter{}, 1)); len(theirs) != 0 {
 		t.Error("another organisation sees it")
 	}
-	if err := s.DeleteEnquiry(other.ID, rows[0].ID); err == nil {
+	if err := s.DeleteEnquiry(other.ID, rows[0].ID, "Owner One"); err == nil {
 		t.Error("another organisation could delete it")
 	}
 	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/enquiries", "", nil); !strings.Contains(page, `"via":"agent:back office"`) {

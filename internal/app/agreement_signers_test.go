@@ -260,7 +260,7 @@ func TestAnAgreementsRecipientsGoWithWhoTheyStandFor(t *testing.T) {
 	if fs := must(s.AgreementFields(o.ID, a.ID)); len(fs) != 0 {
 		t.Errorf("their fields stayed: %+v", fs)
 	}
-	if err := s.RemoveAgreement(o.ID, a.ID); err != nil {
+	if err := s.RemoveAgreement(o.ID, a.ID, "Owner One"); err != nil {
 		t.Fatal(err)
 	}
 	var n int64

@@ -12,15 +12,26 @@ import (
 
 // NewBounceHook makes the organisation's webhook secret, replacing any it had, and
 // gives it back the once.
-func (s *OutreachStore) NewBounceHook(org int64) (string, error) {
+func (s *OutreachStore) NewBounceHook(org int64, actor string) (string, error) {
 	secret := store.RandomToken(32)
 	row := store.BounceHook{OrgID: org, SecretHash: store.HashToken(secret), CreatedAt: time.Now()}
-	err := s.DB.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "org_id"}}, DoUpdates: clause.AssignmentColumns([]string{"secret_hash", "created_at"})}).Create(&row).Error
-	return secret, err
+	return secret, s.DB.Transaction(func(tx *gorm.DB) error {
+		err := tx.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "org_id"}}, DoUpdates: clause.AssignmentColumns([]string{"secret_hash", "created_at"})}).Create(&row).Error
+		if err != nil {
+			return err
+		}
+		return s.Log(tx, org, 0, nil, actor, "hook:new", nil)
+	})
 }
 
-func (s *OutreachStore) DropBounceHook(org int64) error {
-	return s.DB.Delete(&store.BounceHook{}, "org_id = ?", org).Error
+func (s *OutreachStore) DropBounceHook(org int64, actor string) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
+		res := tx.Delete(&store.BounceHook{}, "org_id = ?", org)
+		if res.Error != nil || res.RowsAffected == 0 {
+			return res.Error
+		}
+		return s.Log(tx, org, 0, nil, actor, "hook:remove", nil)
+	})
 }
 
 func (s *OutreachStore) HasBounceHook(org int64) bool {

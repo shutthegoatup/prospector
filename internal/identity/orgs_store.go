@@ -10,6 +10,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
@@ -353,7 +354,12 @@ func (s *IdentityStore) CreateKey(org int64, name string, scopes []string, by st
 	}
 	secret := "pk_" + store.RandomToken(24)
 	k := &store.APIKey{OrgID: org, Name: name, Prefix: secret[:7], Hash: s.Keyring.Lookup(ApiKeys, secret), Scopes: strings.Join(scopes, " "), CreatedBy: by}
-	return secret, k, s.DB.Create(k).Error
+	return secret, k, s.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(k).Error; err != nil {
+			return err
+		}
+		return s.Log(tx, org, 0, nil, by, "key:new", new(k.Name+": "+k.Scopes))
+	})
 }
 
 func (s *IdentityStore) KeyFor(secret string) (*store.APIKey, error) {
@@ -388,7 +394,7 @@ func (s *IdentityStore) Keys(org int64) ([]store.APIKey, error) {
 }
 
 // SetKeyScopes changes what a key may do without changing its secret.
-func (s *IdentityStore) SetKeyScopes(org, id int64, scopes []string) error {
+func (s *IdentityStore) SetKeyScopes(org, id int64, scopes []string, actor string) error {
 	if err := checkScopes(scopes); err != nil {
 		return err
 	}
@@ -408,15 +414,33 @@ func (s *IdentityStore) SetKeyScopes(org, id int64, scopes []string) error {
 			ordered = append(ordered, sc.Name)
 		}
 	}
-	return s.InOrg(org).Model(&store.APIKey{}).Where("id = ? and revoked_at is null", id).Update("scopes", strings.Join(ordered, " ")).Error
+	now := strings.Join(ordered, " ")
+	if now == k.Scopes {
+		return nil
+	}
+	return s.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&store.APIKey{}).Where("org_id = ? and id = ? and revoked_at is null", org, id).Update("scopes", now).Error; err != nil {
+			return err
+		}
+		return s.Log(tx, org, 0, nil, actor, "key:scopes", new(k.Name+": "+now))
+	})
 }
 
-func (s *IdentityStore) RevokeKey(org, id int64) error {
-	res := s.InOrg(org).Model(&store.APIKey{}).Where("id = ?", id).Update("revoked_at", time.Now())
-	if res.Error == nil && res.RowsAffected == 0 {
-		return gorm.ErrRecordNotFound
-	}
-	return res.Error
+func (s *IdentityStore) RevokeKey(org, id int64, actor string) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
+		var k store.APIKey
+		res := tx.Model(&k).Clauses(clause.Returning{}).Where("org_id = ? and id = ? and revoked_at is null", org, id).Update("revoked_at", time.Now())
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			if err := tx.Where("org_id = ? and id = ?", org, id).First(&store.APIKey{}).Error; err != nil {
+				return err
+			}
+			return nil
+		}
+		return s.Log(tx, org, 0, nil, actor, "key:revoke", &k.Name)
+	})
 }
 
 func (s *IdentityStore) SaveOrg(o *store.Org) error {

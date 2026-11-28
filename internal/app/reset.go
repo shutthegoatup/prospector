@@ -156,10 +156,10 @@ type mailIn struct {
 }
 
 // saveMail keeps an organisation's own mail server, or drops it for an empty host.
-func (a *App) saveMail(org int64, in mailIn) (cleared bool, err error) {
+func (a *App) saveMail(org int64, in mailIn, actor string) (cleared bool, err error) {
 	in.Host = strings.TrimSpace(in.Host)
 	if in.Host == "" {
-		return true, a.s.DeleteOrgMail(org)
+		return true, a.s.DeleteOrgMail(org, actor)
 	}
 	m := &store.OrgMail{OrgID: org, Host: in.Host, Port: in.Port, Username: strings.TrimSpace(in.Username), Sender: strings.TrimSpace(in.Sender)}
 	err = (mailer.Server{Host: m.Host, Port: m.Port, From: m.Sender}).Check()
@@ -181,7 +181,7 @@ func (a *App) saveMail(org int64, in mailIn) (cleared bool, err error) {
 			return false, err
 		}
 	}
-	return false, a.s.SaveOrgMail(m)
+	return false, a.s.SaveOrgMail(org, m, actor)
 }
 
 func (a *App) testMail(ctx context.Context, q *request.Req) (string, error) {
